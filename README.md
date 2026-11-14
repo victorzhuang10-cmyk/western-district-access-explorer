@@ -7,7 +7,7 @@ An interactive 3D walking-accessibility prototype for public green space and out
 - Public preview: <https://victorzhuang10-cmyk.github.io/western-district-access-explorer/>
 - Public source repository: <https://github.com/victorzhuang10-cmyk/western-district-access-explorer>
 
-The preview uses an OpenStreetMap/OpenFreeMap 3D vector map with extruded buildings, Hong Kong CSDI destination points, and the Lands Department 3D Pedestrian Route service for walking paths, network distance, and route elevations. Controls set a 100 m–2 km walking-network distance and a 3–20° maximum sampled slope. City, simplified 3D access-diagram, and 3D elevation-section presentations are selectable. Open-space source records are points, not park parcel boundaries.
+The preview uses an OpenStreetMap/OpenFreeMap 3D vector map with extruded buildings, Hong Kong CSDI destination points, and the Lands Department 3D Pedestrian Route service for walking paths, network distance, and route elevations. Controls set a 100 m–2 km walking-network distance and a 3–20° maximum sampled slope. City, simplified 3D access-diagram, and 3D elevation-section presentations are selectable. Its no-key buffer is a 12-direction sample of actual 3D walking routes clipped by distance and slope; it is a planning approximation, not a complete isochrone. Open-space source records are points, not park parcel boundaries.
 
 ## Run the full app locally
 
