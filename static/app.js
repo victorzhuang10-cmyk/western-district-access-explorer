@@ -1,5 +1,5 @@
 const ORIGIN = { latitude: 22.2833, longitude: 114.1285 };
-const MAP_CENTER = { latitude: 22.2819, longitude: ORIGIN.longitude };
+const MAP_CENTER = { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude };
 const $ = (id) => document.getElementById(id);
 const apiUrl = (path) => new URL(`${location.pathname.includes('/static/') ? '../' : './'}api/${path}`, document.baseURI).toString();
 const staticUrl = (path) => new URL(`./${path}`, document.baseURI).toString();
