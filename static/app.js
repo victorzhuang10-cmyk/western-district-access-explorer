@@ -2,7 +2,7 @@ const ORIGIN = { latitude: 22.2833, longitude: 114.1285 };
 const $ = (id) => document.getElementById(id);
 const apiUrl = (path) => new URL(`${location.pathname.includes('/static/') ? '../' : './'}api/${path}`, document.baseURI).toString();
 const staticUrl = (path) => new URL(`./${path}`, document.baseURI).toString();
-const state = { timeMinutes: 5, slope: 10, filter: 'all', view: 'terrain', places: [], google: false, isochrone: null, sectionPlaceId: null, map: null, maplibre: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, routeFailures: new Set() };
+const state = { distanceMetres: 300, slope: 10, filter: 'all', view: 'terrain', places: [], google: false, isochrone: null, sectionPlaceId: null, map: null, maplibre: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, routeFailures: new Set(), boundaryCache: new Map() };
 
 function formatDistance(m) { return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`; }
 function durationMinutes(p) { return p.duration_s != null ? p.duration_s / 60 : null; }
@@ -34,7 +34,9 @@ function renderList() {
   $('place-list').innerHTML = visible.map(p => {
     const [label, cls] = status(p);
     const icon = p.kind === 'green' ? '♧' : '✳';
-    const extra = p.routeAnalysis
+    const extra = p.routeAnalysis && p.route_exists === false
+      ? 'No connected pedestrian route was returned'
+      : p.routeAnalysis
       ? `${Math.max(1, Math.round(durationMinutes(p)))} min · ${formatDistance(p.distance_m)} walking · ${Number(p.max_slope_deg).toFixed(1)}° max`
       : `CSDI location · ${formatDistance(p.study_distance_m)} study distance`;
     return `<div class="place-item ${accessible(p) ? 'is-accessible' : ''}" data-id="${escapeHtml(p.id)}"><span class="place-icon ${p.kind}">${icon}</span><span class="place-info"><strong>${escapeHtml(p.name)}</strong><small>${escapeHtml(extra)}</small></span><span class="place-status ${cls}">${escapeHtml(label)}</span></div>`;
@@ -211,6 +213,54 @@ async function landsDRoute(place, origin) {
   if (!Number.isFinite(minutes) || !Number.isFinite(distance)) throw new Error('Route service returned no walking time or distance');
   return { routeAnalysis: true, route_exists: true, accessible: true, route_source: 'Lands Department 3D Pedestrian Network', duration_s: Math.round(minutes * 60), distance_m: distance, max_slope_deg: Math.round(Math.max(...slopes) * 10) / 10, path };
 }
+function radialDestination(origin, metres, bearing) {
+  const angle = bearing * Math.PI / 180, north = metres * Math.cos(angle), east = metres * Math.sin(angle);
+  return [origin.longitude + east / (111320 * Math.cos(origin.latitude * Math.PI / 180)), origin.latitude + north / 111320];
+}
+function accessiblePrefixEndpoint(path, radius, maxSlope) {
+  if (!path || path.length < 2) return null;
+  let travelled = 0;
+  for (let i = 1; i < path.length; i++) {
+    const previous = path[i - 1], next = path[i], segment = Math.max(.5, haversineMetres(previous, next));
+    const grade = Math.atan2(Math.abs(next[2] - previous[2]), segment) * 180 / Math.PI;
+    if (grade > maxSlope) return travelled >= 20 ? previous : null;
+    if (travelled + segment >= radius) {
+      const t = Math.max(0, Math.min(1, (radius - travelled) / segment));
+      return [previous[0] + (next[0] - previous[0]) * t, previous[1] + (next[1] - previous[1]) * t, previous[2] + (next[2] - previous[2]) * t];
+    }
+    travelled += segment;
+  }
+  return travelled >= radius * .7 ? path[path.length - 1] : null;
+}
+async function buildLandsDContour(origin, originVersion) {
+  const distanceMetres = state.distanceMetres, maxSlope = state.slope;
+  const cacheKey = `${originVersion}/${distanceMetres}/${maxSlope}`;
+  if (state.boundaryCache.has(cacheKey)) { state.isochrone = state.boundaryCache.get(cacheKey); render(); return; }
+  const boundary = [];
+  for (let spoke = 0; spoke < 12; spoke++) {
+    if (originVersion !== state.originVersion) return;
+    $('data-status').textContent = `SAMPLING 3D WALKING BUFFER · ${spoke + 1}/12`;
+    const coordinates = radialDestination(origin, Math.min(4000, distanceMetres * 1.6), spoke * 30);
+    const target = { id: `buffer-${spoke}`, name: 'Walking-distance boundary sample', coordinates };
+    try {
+      const route = await landsDRoute(target, origin);
+      if (route.route_exists && route.path?.length) {
+        const endpoint = accessiblePrefixEndpoint(route.path, distanceMetres, maxSlope);
+        if (endpoint) boundary.push({ bearing: spoke * 30, coordinate: endpoint });
+      }
+    } catch (error) { console.warn(`Walking buffer sample ${spoke + 1} unavailable.`, error); }
+    if (spoke < 11) await wait(500);
+  }
+  if (originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope) return;
+  if (boundary.length >= 8) {
+    const coordinates = boundary.sort((a, b) => a.bearing - b.bearing).map(point => point.coordinate.slice(0, 2));
+    coordinates.push(coordinates[0]);
+    state.isochrone = { type: 'Feature', properties: { method: '12 radial samples of Lands Department 3D walking routes, clipped at network distance and grade limit', sample_count: boundary.length, distance_m: distanceMetres, max_slope_deg: maxSlope }, geometry: { type: 'Polygon', coordinates: [coordinates] } };
+  } else state.isochrone = null;
+  state.boundaryCache.set(cacheKey, state.isochrone);
+  $('data-status').textContent = `LANDS DEPARTMENT 3D ROUTES · ${state.places.length} CSDI DESTINATIONS`;
+  render();
+}
 let landsDTimer;
 function scheduleLandsDAnalysis() { clearTimeout(landsDTimer); landsDTimer = setTimeout(runLandsDAnalysis, 900); }
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -236,7 +286,7 @@ async function runLandsDAnalysis() {
       render();
       if (i + 1 < todo.length) await wait(500);
     }
-    if (originVersion === state.originVersion) $('data-status').textContent = 'LANDS DEPARTMENT 3D ROUTES · CSDI DESTINATIONS';
+    if (originVersion === state.originVersion) await buildLandsDContour(origin, originVersion);
   } finally {
     state.routeQueueRunning = false;
     if (state.routeQueueRequested) { state.routeQueueRequested = false; scheduleLandsDAnalysis(); }
