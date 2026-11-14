@@ -118,7 +118,7 @@ function setView(mode) {
         state.maplibre.setPaintProperty(layer.id, 'fill-extrusion-opacity', mode === 'diagram' ? .46 : .58);
       }
     }
-    if (mode !== 'section') state.maplibre.flyTo({ center: state.maplibre.getCenter(), zoom: mode === 'terrain' ? 15.6 : 16.2, pitch: mode === 'terrain' ? 48 : 42, bearing: mode === 'terrain' ? -17 : 0, duration: 700 });
+    if (mode !== 'section') state.maplibre.flyTo({ center: state.maplibre.getCenter(), zoom: mode === 'terrain' ? 15.6 : 16.2, pitch: mode === 'terrain' ? 30 : 35, bearing: mode === 'terrain' ? -12 : 0, duration: 700 });
   }
 }
 function renderCesiumOverlays() {
@@ -347,7 +347,7 @@ function addMapLibreLayers(map) {
 }
 function initMapLibre() {
   if (!window.maplibregl) { showToast('The 3D map library did not load. Check the connection and refresh.'); return; }
-  const map = new maplibregl.Map({ container: 'maplibre-container', style: 'https://tiles.openfreemap.org/styles/liberty', center: [ORIGIN.longitude, ORIGIN.latitude], zoom: 15.6, pitch: 48, bearing: -17, maxPitch: 70, attributionControl: true, antialias: true, cooperativeGestures: true });
+  const map = new maplibregl.Map({ container: 'maplibre-container', style: 'https://tiles.openfreemap.org/styles/liberty', center: [ORIGIN.longitude, ORIGIN.latitude], zoom: 15.6, pitch: 30, bearing: -12, maxPitch: 65, attributionControl: true, antialias: true, cooperativeGestures: true });
   state.maplibre = map;
   map.addControl(new maplibregl.NavigationControl({ showCompass: false, showZoom: false }), 'top-right');
   map.on('load', () => {
@@ -414,5 +414,5 @@ document.querySelector('.dialog-close').addEventListener('click', () => $('about
 $('locate-origin').addEventListener('click', () => { if (!state.map && !state.maplibre) return showToast('The map is still loading.'); state.pickOrigin = true; $('locate-origin').textContent = 'CLICK MAP TO SET'; showToast('Click the map to move the origin.'); });
 $('zoom-in').addEventListener('click', () => { if (state.map) state.map.camera.zoomIn(250); else if (state.maplibre) state.maplibre.zoomIn({ duration: 250 }); });
 $('zoom-out').addEventListener('click', () => { if (state.map) state.map.camera.zoomOut(250); else if (state.maplibre) state.maplibre.zoomOut({ duration: 250 }); });
-$('reset-view').addEventListener('click', () => { if (state.map) setView(state.view); else if (state.maplibre) state.maplibre.flyTo({ center: [ORIGIN.longitude, ORIGIN.latitude], zoom: 15.6, pitch: state.view === 'terrain' ? 48 : 30, bearing: state.view === 'terrain' ? -17 : 0, duration: 700 }); });
+$('reset-view').addEventListener('click', () => { if (state.map) setView(state.view); else if (state.maplibre) state.maplibre.flyTo({ center: [ORIGIN.longitude, ORIGIN.latitude], zoom: 15.6, pitch: state.view === 'terrain' ? 30 : 35, bearing: state.view === 'terrain' ? -12 : 0, duration: 700 }); });
 setRange(); loadAccessPoints().then(initGoogle);
