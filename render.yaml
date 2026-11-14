@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: western-district-access-explorer
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/config
+    envVars:
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: ORIGIN_LAT
+        value: "22.2833"
+      - key: ORIGIN_LNG
+        value: "114.1285"

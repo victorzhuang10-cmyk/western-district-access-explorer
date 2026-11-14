@@ -24,6 +24,10 @@ Open <http://127.0.0.1:8000>. The FastAPI service keeps the Google key on the se
 
 GitHub Pages hosts only the static preview; it does not run FastAPI or provide server secrets. Google Photorealistic 3D Tiles and Google Routes are available only on a deployment with the backend and a configured key. The Pages preview calls the official Lands Department pedestrian-route service directly for its 3D route and elevation data.
 
+## Deploy the Google-enabled app
+
+The repository includes `render.yaml` for a same-origin FastAPI deployment. In Render, create a Blueprint from this public repository. Render will prompt for `GOOGLE_MAPS_API_KEY`; add the key there and keep it out of GitHub. Enable the Maps Tiles, Routes, and Elevation APIs in the matching Google Cloud project. The resulting `onrender.com` URL serves the interactive site and its `/api` endpoints together. The GitHub Pages URL remains the no-key Lands Department preview.
+
 ## Data workflow
 
 `notebooks/prepare_access_data.ipynb` uses GeoPandas to inspect CSDI / GeoInfo and DATA.GOV.HK layers, project them to Hong Kong 1980 Grid (EPSG:2326), request the app's walking contour, clip green-space polygons and outdoor-fitness locations to that contour, and export web-ready GeoJSON. Download source records into `data/source/`, check the schema and CRS, verify the community-centre entrance, and record source URLs, retrieval dates, and licence metadata. The checked-in `static/data/access-points.geojson` contains a study-area subset of public CSDI records. Open-space records in this layer indicate locations, not full park boundaries.
