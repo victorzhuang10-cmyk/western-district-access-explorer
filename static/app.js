@@ -2,7 +2,7 @@ const ORIGIN = { latitude: 22.2833, longitude: 114.1285 };
 const $ = (id) => document.getElementById(id);
 const apiUrl = (path) => new URL(`${location.pathname.includes('/static/') ? '../' : './'}api/${path}`, document.baseURI).toString();
 const staticUrl = (path) => new URL(`./${path}`, document.baseURI).toString();
-const state = { distanceMetres: 300, slope: 10, filter: 'all', view: 'terrain', places: [], google: false, isochrone: null, sectionPlaceId: null, map: null, maplibre: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, routeFailures: new Set(), boundaryCache: new Map() };
+const state = { distanceMetres: 300, slope: 10, filter: 'all', view: 'terrain', places: [], google: false, isochrone: null, boundarySamples: 0, sectionPlaceId: null, map: null, maplibre: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, routeFailures: new Set(), boundaryCache: new Map() };
 
 function formatDistance(m) { return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`; }
 function durationMinutes(p) { return p.duration_s != null ? p.duration_s / 60 : null; }
@@ -252,13 +252,16 @@ async function buildLandsDContour(origin, originVersion) {
     if (spoke < 11) await wait(500);
   }
   if (originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope) return;
-  if (boundary.length >= 8) {
+  state.boundarySamples = boundary.length;
+  if (boundary.length >= 6) {
     const coordinates = boundary.sort((a, b) => a.bearing - b.bearing).map(point => point.coordinate.slice(0, 2));
     coordinates.push(coordinates[0]);
     state.isochrone = { type: 'Feature', properties: { method: '12 radial samples of Lands Department 3D walking routes, clipped at network distance and grade limit', sample_count: boundary.length, distance_m: distanceMetres, max_slope_deg: maxSlope }, geometry: { type: 'Polygon', coordinates: [coordinates] } };
   } else state.isochrone = null;
   state.boundaryCache.set(cacheKey, state.isochrone);
-  $('data-status').textContent = `LANDS DEPARTMENT 3D ROUTES · ${state.places.length} CSDI DESTINATIONS`;
+  $('data-status').textContent = state.isochrone
+    ? `LANDS DEPARTMENT 3D ROUTES · ${boundary.length}/12 BUFFER SAMPLES`
+    : `LANDS DEPARTMENT 3D ROUTES · BUFFER WITHHELD (${boundary.length}/12 SLOPE-SAFE SAMPLES)`;
   render();
 }
 let landsDTimer;
@@ -315,8 +318,8 @@ function addMapLibreLayers(map) {
   map.addSource('access-routes', { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, lineMetrics: true });
   map.addSource('access-places', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addSource('map-origin', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-  map.addLayer({ id: 'walk-buffer-fill', type: 'fill', source: 'walk-buffer', paint: { 'fill-color': '#cb634c', 'fill-opacity': .09 } });
-  map.addLayer({ id: 'walk-buffer-outline', type: 'line', source: 'walk-buffer', paint: { 'line-color': '#c85d45', 'line-width': 2, 'line-dasharray': [2, 2], 'line-opacity': .8 } });
+  map.addLayer({ id: 'walk-buffer-fill', type: 'fill', source: 'walk-buffer', paint: { 'fill-color': '#cb634c', 'fill-opacity': .2 } });
+  map.addLayer({ id: 'walk-buffer-outline', type: 'line', source: 'walk-buffer', paint: { 'line-color': '#c85d45', 'line-width': 2.5, 'line-dasharray': [2, 2], 'line-opacity': .95 } });
   map.addLayer({ id: 'accessible-route-casing', type: 'line', source: 'access-routes', paint: { 'line-color': '#fffdf6', 'line-width': 9, 'line-opacity': .96 } });
   map.addLayer({ id: 'accessible-routes', type: 'line', source: 'access-routes', paint: { 'line-color': '#16755f', 'line-width': 5, 'line-opacity': 1 } });
   map.addLayer({ id: 'access-place-points', type: 'circle', source: 'access-places', paint: { 'circle-radius': 8, 'circle-color': ['match', ['get', 'kind'], 'gym', '#c89040', '#287461'], 'circle-stroke-color': '#f8f7f0', 'circle-stroke-width': 3 } });
