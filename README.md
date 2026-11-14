@@ -12,7 +12,7 @@ cp .env.example .env
 uvicorn app:app --reload
 ```
 
-Open <http://127.0.0.1:8000>. Without a Google Maps Platform key, the page uses illustrative demo routes and a stylized 3D basemap. Configure `GOOGLE_MAPS_API_KEY` in `.env` to enable Google Routes, Elevation, and Photorealistic 3D Tiles. Enable the Map Tiles API, Routes API, and Elevation API in the associated Google Cloud project, set billing, and restrict the key to this app's server IP / APIs. Do not commit `.env`.
+Open <http://127.0.0.1:8000>. Without a Google Maps Platform key, the page renders a real OpenFreeMap/OpenStreetMap vector basemap with extruded 3D buildings in MapLibre GL JS. The bundled destination points and walking paths are illustrative until replaced with verified GeoJSON and live routing. Configure `GOOGLE_MAPS_API_KEY` in `.env` to enable Google's walking routes, elevation sampling, and Photorealistic 3D Tiles. Enable the Map Tiles API, Routes API, and Elevation API in the associated Google Cloud project, set billing, and restrict the key to this app's server IP / APIs. Do not commit `.env`.
 
 ## Data workflow
 
