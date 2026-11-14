@@ -26,4 +26,6 @@ The current implementation requests direct routes to points; it does not yet com
 
 ## GitHub
 
-Project repository: <https://github.com/victorzhuang10-cmyk/western-district-access-explorer> (private). The local `main` branch tracks `origin/main`.
+Project repository: <https://github.com/victorzhuang10-cmyk/western-district-access-explorer>. The local `main` branch tracks `origin/main`.
+
+The GitHub Pages workflow publishes the `static/` folder as a shareable interactive preview. It includes the live OpenFreeMap 3D buildings layer and illustrative sample destinations/routes. GitHub Pages does not run the FastAPI backend, so Google routing, elevation screening, Google Photorealistic 3D Tiles, and server-loaded GeoJSON require the full local/server deployment above. Set the Pages source to **GitHub Actions** in repository settings if it has not been configured already.

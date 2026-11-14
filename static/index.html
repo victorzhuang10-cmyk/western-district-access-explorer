@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
   <link href="https://unpkg.com/maplibre-gl@6.18.0/dist/maplibre-gl.css" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
   <header class="topbar">
@@ -71,7 +71,7 @@
 
       <div class="view-switcher"><div class="switch-copy"><span>MAP PRESENTATION</span><small>Choose how to read this place</small></div><button class="view-option selected" data-view="terrain"><span class="view-thumb thumb-terrain"><i></i></span><span><b>3D CITY</b><small>Place in context</small></span><i class="radio"></i></button><button class="view-option" data-view="diagram"><span class="view-thumb thumb-diagram"><i></i></span><span><b>3D DIAGRAM</b><small>Routes &amp; reach</small></span><i class="radio"></i></button></div>
       <div class="north-arrow">N <span>↑</span></div>
-      <div class="map-attribution" id="map-attribution">DEMO TERRAIN · REPLACE WITH GOOGLE PHOTOREALISTIC 3D TILES</div>
+      <div class="map-attribution" id="map-attribution">OPENFREEMAP · © OPENSTREETMAP CONTRIBUTORS</div>
       <div class="map-zoom-hint">DRAG TO ORBIT <span>·</span> SCROLL TO ZOOM</div>
       <div class="toast" id="toast" role="status"></div>
     </section>
@@ -83,7 +83,7 @@
   <script type="module">
     import * as maplibregl from 'https://unpkg.com/maplibre-gl@6.18.0/dist/maplibre-gl.mjs';
     window.maplibregl = maplibregl;
-    import('/static/app.js');
+    import('./app.js');
   </script>
 </body>
 </html>

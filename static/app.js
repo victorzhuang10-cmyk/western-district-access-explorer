@@ -7,6 +7,7 @@ const DEMO_PLACES = [
 ];
 const ORIGIN = { latitude: 22.2833, longitude: 114.1285 };
 const $ = (id) => document.getElementById(id);
+const apiUrl = (path) => new URL(`${location.pathname.includes('/static/') ? '../' : './'}api/${path}`, document.baseURI).toString();
 const state = { radius: 300, slope: 10, filter: 'all', view: 'terrain', places: structuredClone(DEMO_PLACES), google: false, map: null, maplibre: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false };
 
 function formatDistance(m) { return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`; }
@@ -77,7 +78,7 @@ function pointFromFeature(feature) {
 }
 async function loadAccessPoints() {
   try {
-    const collection = await fetch('/api/access-points').then(r => { if (!r.ok) throw new Error('GeoJSON not available'); return r.json(); });
+    const collection = await fetch(apiUrl('access-points')).then(r => { if (!r.ok) throw new Error('GeoJSON not available'); return r.json(); });
     const loaded = (collection.features || []).map((feature, i) => {
       const coordinates = pointFromFeature(feature); if (!coordinates) return null;
       const properties = feature.properties || {};
@@ -110,7 +111,7 @@ function setView(mode) {
     for (const layer of state.maplibre.getStyle().layers) {
       if (layer.type === 'fill-extrusion') state.maplibre.setLayoutProperty(layer.id, 'visibility', mode === 'terrain' ? 'visible' : 'none');
     }
-    state.maplibre.flyTo({ center: state.maplibre.getCenter(), zoom: mode === 'terrain' ? 15.6 : 16.2, pitch: mode === 'terrain' ? 58 : 30, bearing: mode === 'terrain' ? -17 : 0, duration: 700 });
+    state.maplibre.flyTo({ center: state.maplibre.getCenter(), zoom: mode === 'terrain' ? 15.6 : 16.2, pitch: mode === 'terrain' ? 48 : 30, bearing: mode === 'terrain' ? -17 : 0, duration: 700 });
   }
 }
 function coordsForDemo(p) {
@@ -214,7 +215,7 @@ function addMapLibreLayers(map) {
 }
 function initMapLibre() {
   if (!window.maplibregl) { showToast('The 3D map library did not load. Check the connection and refresh.'); return; }
-  const map = new maplibregl.Map({ container: 'maplibre-container', style: 'https://tiles.openfreemap.org/styles/liberty', center: [ORIGIN.longitude, ORIGIN.latitude], zoom: 15.6, pitch: 58, bearing: -17, maxPitch: 70, attributionControl: true, antialias: true, cooperativeGestures: true });
+  const map = new maplibregl.Map({ container: 'maplibre-container', style: 'https://tiles.openfreemap.org/styles/liberty', center: [ORIGIN.longitude, ORIGIN.latitude], zoom: 15.6, pitch: 48, bearing: -17, maxPitch: 70, attributionControl: true, antialias: true, cooperativeGestures: true });
   state.maplibre = map;
   map.addControl(new maplibregl.NavigationControl({ showCompass: false, showZoom: false }), 'top-right');
   map.on('load', () => {
@@ -229,13 +230,13 @@ function initMapLibre() {
 }
 async function initGoogle() {
   try {
-    const config = await fetch('/api/config').then(r => r.json());
+    const config = await fetch(apiUrl('config')).then(r => r.json());
     if (!config.google_enabled || !window.Cesium) { initMapLibre(); return; }
     state.google = true;
     const viewer = new Cesium.Viewer('cesium-container', { animation: false, baseLayerPicker: false, fullscreenButton: false, geocoder: false, homeButton: false, infoBox: false, sceneModePicker: false, selectionIndicator: false, timeline: false, navigationHelpButton: false, creditContainer: document.createElement('div'), skyAtmosphere: new Cesium.SkyAtmosphere(), baseLayer: false });
     viewer.scene.globe.show = false; viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#d4ded4');
     viewer.scene.screenSpaceCameraController.enableCollisionDetection = false;
-    const tiles = await Cesium.Cesium3DTileset.fromUrl('/api/google-3d-tiles/v1/3dtiles/root.json');
+    const tiles = await Cesium.Cesium3DTileset.fromUrl(apiUrl('google-3d-tiles/v1/3dtiles/root.json'));
     viewer.scene.primitives.add(tiles);
     viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(114.1285, 22.2833, 1450), orientation: { heading: Cesium.Math.toRadians(12), pitch: Cesium.Math.toRadians(-48), roll: 0 } });
     viewer.scene.globe.depthTestAgainstTerrain = true;
@@ -259,7 +260,7 @@ async function runGoogleAnalysis() {
   if (!state.google) return;
   const destinations = state.places.map(p => ({ id: p.id, name: p.name, kind: p.kind, latitude: p.coordinates?.[1] ?? { 'green-1':22.2843,'green-2':22.2824,'green-3':22.2846,'gym-1':22.2817,'gym-2':22.2850 }[p.id], longitude: p.coordinates?.[0] ?? { 'green-1':114.1280,'green-2':114.1305,'green-3':114.1247,'gym-1':114.1262,'gym-2':114.1312 }[p.id] }));
   try {
-    const response = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ origin: { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude }, destinations, radius_m: state.radius, max_slope_deg: state.slope }) });
+    const response = await fetch(apiUrl('analyze'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ origin: { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude }, destinations, radius_m: state.radius, max_slope_deg: state.slope }) });
     if (!response.ok) throw new Error(await response.text());
     const payload = await response.json();
     state.places = payload.results.map(result => {
@@ -279,5 +280,5 @@ document.querySelector('.dialog-close').addEventListener('click', () => $('about
 $('locate-origin').addEventListener('click', () => { if (!state.map) return showToast('Choose a point on the map after enabling Google 3D Tiles.'); state.pickOrigin = true; $('locate-origin').textContent = 'CLICK MAP TO SET'; showToast('Click the map to place the origin.'); });
 $('zoom-in').addEventListener('click', () => { if (state.map) state.map.camera.zoomIn(250); else if (state.maplibre) state.maplibre.zoomIn({ duration: 250 }); });
 $('zoom-out').addEventListener('click', () => { if (state.map) state.map.camera.zoomOut(250); else if (state.maplibre) state.maplibre.zoomOut({ duration: 250 }); });
-$('reset-view').addEventListener('click', () => { if (state.map) setView(state.view); else if (state.maplibre) state.maplibre.flyTo({ center: [114.1285, 22.2833], zoom: 15.6, pitch: state.view === 'terrain' ? 58 : 63, bearing: -17, duration: 700 }); });
+$('reset-view').addEventListener('click', () => { if (state.map) setView(state.view); else if (state.maplibre) state.maplibre.flyTo({ center: [114.1285, 22.2833], zoom: 15.6, pitch: state.view === 'terrain' ? 48 : 30, bearing: -17, duration: 700 }); });
 setRange(); loadAccessPoints().then(initGoogle);

@@ -165,3 +165,6 @@ async def analyze(request: AnalyzeRequest):
             except (httpx.HTTPError, KeyError, ValueError) as exc:
                 results.append({"id": dest.id, "name": dest.name, "kind": dest.kind, "accessible": False, "reason": f"Route analysis unavailable: {exc}"})
     return {"results": results, "origin": origin, "radius_m": request.radius_m, "max_slope_deg": request.max_slope_deg}
+
+
+app.mount("/", StaticFiles(directory=ROOT / "static", html=True), name="site")
