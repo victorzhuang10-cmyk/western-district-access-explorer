@@ -15,6 +15,12 @@
 .view-option b{font-size:9px}
 .map-live{max-width:unset}
 .map-attribution{letter-spacing:.02em}
+.third-party-attribution{bottom:37px}
+.google-credits{display:none;position:absolute;z-index:7;left:26px;bottom:7px;max-width:min(62%,560px);padding:4px 7px;background:#f5f4eef0;border:1px solid #ffffffd9;color:#5e625b;font:9px/1.4 var(--ui);box-shadow:0 2px 8px #26352b20;pointer-events:auto}
+.google-credits.active{display:block}
+.google-maps-brand{display:inline-block;margin-right:8px;padding-right:8px;border-right:1px solid #c9cbc1;color:#4285f4;font:600 10px/1.4 Arial,sans-serif;white-space:nowrap}
+.google-credits .cesium-credit-textContainer{display:inline}
+.google-credits .cesium-credit-expand-link{margin-left:5px}
 .place-item{min-height:48px}
 .view-switcher{width:315px}
 .view-option{flex:1;min-width:0}

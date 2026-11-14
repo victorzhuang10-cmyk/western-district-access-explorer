@@ -366,17 +366,19 @@ async function initGoogle() {
     const config = await fetch(apiUrl('config')).then(r => r.json());
     if (!config.google_enabled || !window.Cesium) { initMapLibre(); scheduleLandsDAnalysis(); return; }
     state.google = true;
-    const viewer = new Cesium.Viewer('cesium-container', { animation: false, baseLayerPicker: false, fullscreenButton: false, geocoder: false, homeButton: false, infoBox: false, sceneModePicker: false, selectionIndicator: false, timeline: false, navigationHelpButton: false, creditContainer: document.createElement('div'), skyAtmosphere: new Cesium.SkyAtmosphere(), baseLayer: false });
+    const viewer = new Cesium.Viewer('cesium-container', { animation: false, baseLayerPicker: false, fullscreenButton: false, geocoder: false, homeButton: false, infoBox: false, sceneModePicker: false, selectionIndicator: false, timeline: false, navigationHelpButton: false, creditContainer: $('google-credits'), skyAtmosphere: new Cesium.SkyAtmosphere(), baseLayer: false });
     viewer.scene.globe.show = false; viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#d4ded4');
     viewer.scene.screenSpaceCameraController.enableCollisionDetection = false;
-    const tiles = await Cesium.Cesium3DTileset.fromUrl(apiUrl('google-3d-tiles/v1/3dtiles/root.json'));
+    const tiles = await Cesium.Cesium3DTileset.fromUrl(apiUrl('google-3d-tiles/v1/3dtiles/root.json'), { showCreditsOnScreen: true });
     viewer.scene.primitives.add(tiles);
     viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(114.1285, 22.2833, 1450), orientation: { heading: Cesium.Math.toRadians(12), pitch: Cesium.Math.toRadians(-48), roll: 0 } });
     viewer.scene.globe.depthTestAgainstTerrain = true;
     state.map = viewer;
     $('cesium-container').style.display = 'block';
     $('data-status').textContent = 'GOOGLE 3D TILES · OPEN DATA LAYERS'; $('map-data-label').textContent = 'GOOGLE PHOTOREALISTIC 3D';
-    $('map-attribution').textContent = 'Map from Lands Department · Google Photorealistic 3D Tiles';
+    $('map-attribution').textContent = 'Lands Department · CSDI destination overlays';
+    $('map-attribution').classList.add('third-party-attribution');
+    $('google-credits').classList.add('active');
     renderCesiumOverlays();
     new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas).setInputAction((evt) => {
       if (!state.pickOrigin) return;

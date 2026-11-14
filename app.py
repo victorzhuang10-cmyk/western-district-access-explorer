@@ -6,6 +6,7 @@ import os
 import asyncio
 import json
 from pathlib import Path
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
 from dotenv import load_dotenv
@@ -73,6 +74,8 @@ async def google_3d_session():
 async def google_3d_tiles(tile_path: str, request: Request):
     if not API_KEY:
         raise HTTPException(503, "Google Maps Platform key is not configured")
+    if not tile_path.startswith("v1/3dtiles/") or ".." in Path(tile_path).parts:
+        raise HTTPException(404, "Unknown Google 3D Tiles resource")
     params = dict(request.query_params)
     params["key"] = API_KEY
     url = f"https://tile.googleapis.com/{tile_path}"
@@ -81,7 +84,28 @@ async def google_3d_tiles(tile_path: str, request: Request):
     if response.is_error:
         raise HTTPException(response.status_code, "Google Map Tiles API request failed")
     from fastapi.responses import Response
-    return Response(response.content, media_type=response.headers.get("content-type", "application/octet-stream"))
+    content_type = response.headers.get("content-type", "application/octet-stream")
+    content = response.content
+    if "json" in content_type:
+        document = response.json()
+
+        def proxy_tile_uris(value):
+            if isinstance(value, dict):
+                for key, item in value.items():
+                    if key in {"uri", "url", "template"} and isinstance(item, str):
+                        absolute = urljoin(url, item)
+                        parsed = urlsplit(absolute)
+                        if parsed.hostname == "tile.googleapis.com" and parsed.path.startswith("/v1/3dtiles/"):
+                            value[key] = urlunsplit(("", "", "/api/google-3d-tiles" + parsed.path, parsed.query, parsed.fragment))
+                    else:
+                        proxy_tile_uris(item)
+            elif isinstance(value, list):
+                for item in value:
+                    proxy_tile_uris(item)
+
+        proxy_tile_uris(document)
+        content = json.dumps(document, separators=(",", ":")).encode("utf-8")
+    return Response(content, media_type=content_type)
 
 
 def decode_polyline(encoded: str) -> list[tuple[float, float]]:
