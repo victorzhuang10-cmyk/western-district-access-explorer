@@ -4,7 +4,7 @@ An interactive 3D walking-accessibility prototype for public green space and out
 
 ## Open the site
 
-- Public preview: <https://victorzhuang10-cmyk.github.io/western-district-access-explorer/>
+- Public preview: <https://victorzhuang10-cmyk.github.io/western-district-access-explorer/map.html>
 - Public source repository: <https://github.com/victorzhuang10-cmyk/western-district-access-explorer>
 
 The preview uses an OpenStreetMap/OpenFreeMap 3D vector map with extruded buildings, Hong Kong CSDI destination points, and Lands Department 3D Pedestrian Route times, paths, and elevation samples. The 100 m–2 km slider is an equivalent walk-time budget at a 1 m/s reference pace (300 m = 5 minutes); route accessibility is screened by actual returned travel time and the 3–20° slope control. City, simplified 3D access-diagram, and 3D elevation-section presentations are selectable. The no-key contour samples 12 real 3D routes and apportions each total route time by path length to estimate the boundary; it is a planning approximation, not a complete isochrone. Open-space source records are points, not park parcel boundaries.
