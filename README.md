@@ -7,7 +7,7 @@ An interactive 3D walking-accessibility prototype for public green space and out
 - Public preview: <https://victorzhuang10-cmyk.github.io/western-district-access-explorer/>
 - Public source repository: <https://github.com/victorzhuang10-cmyk/western-district-access-explorer>
 
-The preview uses an OpenStreetMap/OpenFreeMap 3D vector map with extruded buildings, Hong Kong CSDI destination points, and the Lands Department 3D Pedestrian Route service for walking paths, network distance, and route elevations. Controls set a 100 m–2 km walking-network distance and a 3–20° maximum sampled slope. City, simplified 3D access-diagram, and 3D elevation-section presentations are selectable. Its no-key buffer is a 12-direction sample of actual 3D walking routes clipped by distance and slope; it is a planning approximation, not a complete isochrone. Open-space source records are points, not park parcel boundaries.
+The preview uses an OpenStreetMap/OpenFreeMap 3D vector map with extruded buildings, Hong Kong CSDI destination points, and Lands Department 3D Pedestrian Route times, paths, and elevation samples. The 100 m–2 km slider is an equivalent walk-time budget at a 1 m/s reference pace (300 m = 5 minutes); route accessibility is screened by actual returned travel time and the 3–20° slope control. City, simplified 3D access-diagram, and 3D elevation-section presentations are selectable. The no-key contour samples 12 real 3D routes and apportions each total route time by path length to estimate the boundary; it is a planning approximation, not a complete isochrone. Open-space source records are points, not park parcel boundaries.
 
 ## Run the full app locally
 
@@ -20,7 +20,7 @@ cp .env.example .env
 uvicorn app:app --reload
 ```
 
-Open <http://127.0.0.1:8000>. The FastAPI service keeps the Google key on the server and can provide Google Routes walking directions, route elevation samples, a sampled walking-distance contour, and Google Photorealistic 3D Tiles. Enable the Map Tiles API, Routes API, and Elevation API in the Google Cloud project and configure billing and key restrictions. Never commit `.env`.
+Open <http://127.0.0.1:8000>. The FastAPI service keeps the Google key on the server and can provide Google Routes walking directions, route elevation samples, a sampled walking-time contour, and Google Photorealistic 3D Tiles. Enable the Map Tiles API, Routes API, and Elevation API in the Google Cloud project and configure billing and key restrictions. Never commit `.env`.
 
 GitHub Pages hosts only the static preview; it does not run FastAPI or provide server secrets. Google Photorealistic 3D Tiles and Google Routes are available only on a deployment with the backend and a configured key. The Pages preview calls the official Lands Department pedestrian-route service directly for its 3D route and elevation data.
 
@@ -32,7 +32,7 @@ Install the optional notebook tools with `pip install -r requirements-gis.txt`. 
 
 ## How the access screening works
 
-The route services provide 3D geometry, walking distance, and travel time. The app estimates the steepest absolute elevation-sample angle as `atan(abs(Δelevation) / horizontal distance)`. The Google contour endpoint samples routes across 24 directions and checks candidate edges against distance and slope thresholds. This is a sampled approximation of walkable reach, not a complete pedestrian-network isochrone; it can miss alleys, route alternatives, stairs, kerbs, crossing quality, surface condition, closures, and step-free entrances. Elevation resolution may miss short ramps or steps. Field checks and a verified pedestrian network are needed before product or policy decisions.
+The route services provide 3D geometry, walking distance, and travel time. The app estimates the steepest absolute elevation-sample angle as `atan(abs(Δelevation) / horizontal distance)`. The Google contour endpoint samples routes across 24 directions and checks candidate edges against Google walking duration and slope thresholds. This is a sampled approximation of walkable reach, not a complete pedestrian-network isochrone; it can miss alleys, route alternatives, stairs, kerbs, crossing quality, surface condition, closures, and step-free entrances. Elevation resolution may miss short ramps or steps. Field checks and a verified pedestrian network are needed before product or policy decisions.
 
 The 3D section is based on returned route elevation samples. Treat every result as exploratory, not as an accessibility certification. Lands Department routes require the map-face logo and copyright attribution shown in the interface. Google map data must retain required attribution and be used under the applicable Maps Platform terms.
 

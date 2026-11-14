@@ -4,6 +4,7 @@ from __future__ import annotations
 import math
 import os
 import asyncio
+import json
 from pathlib import Path
 
 import httpx
@@ -36,7 +37,7 @@ class Destination(BaseModel):
 class AnalyzeRequest(BaseModel):
     origin: dict[str, float] | None = None
     destinations: list[Destination] = Field(default_factory=list, max_length=40)
-    distance_m: int = Field(300, ge=100, le=2000)
+    walk_time_seconds: int = Field(300, ge=100, le=2000)
     max_slope_deg: float = Field(10, ge=3, le=20)
 
 
@@ -159,24 +160,24 @@ async def analyze(request: AnalyzeRequest):
         for dest in request.destinations:
             try:
                 result = await google_route(client, origin, dest)
-                if result.get("distance_m", 0) > request.distance_m:
-                    result.update(accessible=False, reason="Beyond selected walking-network distance")
+                if result.get("duration_s", 0) > request.walk_time_seconds:
+                    result.update(accessible=False, reason="Beyond selected walking-time threshold")
                 elif result.get("max_slope_deg", 0) > request.max_slope_deg:
                     result.update(accessible=False, reason="Route exceeds slope limit")
                 results.append(result)
             except (httpx.HTTPError, KeyError, ValueError) as exc:
                 results.append({"id": dest.id, "name": dest.name, "kind": dest.kind, "accessible": False, "reason": f"Route analysis unavailable: {exc}"})
-    return {"results": results, "origin": origin, "distance_m": request.distance_m, "max_slope_deg": request.max_slope_deg}
+    return {"results": results, "origin": origin, "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg}
 
 
 def walking_candidates(origin: dict[str, float], distance_m: int, spokes: int = 24) -> list[dict]:
-    """Create a polar grid around the requested walking-network distance."""
+    """Create radial candidates for a route-time boundary, sized from the 1 m/s distance equivalent."""
     points = []
     fractions = (0.35, 0.55, 0.75, 0.95, 1.15)
     for spoke in range(spokes):
         bearing = 2 * math.pi * spoke / spokes
         for ring, fraction in enumerate(fractions):
-            distance = min(2000, distance_m * fraction)
+            distance = min(4000, distance_m * fraction)
             north_m, east_m = distance * math.cos(bearing), distance * math.sin(bearing)
             latitude = origin["latitude"] + north_m / 111_320
             longitude = origin["longitude"] + east_m / (111_320 * math.cos(math.radians(origin["latitude"])))
@@ -193,11 +194,11 @@ def seconds(value: str | None) -> int:
 
 @app.post("/api/isochrone")
 async def isochrone(request: AnalyzeRequest):
-    """Approximate a walking-distance contour from route-matrix and slope-screened routes."""
+    """Approximate a Google walking-time contour from matrix and slope-screened routes."""
     if not API_KEY:
         raise HTTPException(503, "Google Maps Platform key is not configured; the static preview does not show a fabricated circle")
     origin = request.origin or ORIGIN
-    candidates = walking_candidates(origin, request.distance_m)
+    candidates = walking_candidates(origin, request.walk_time_seconds)
     matrix_request = {
         "origins": [{"waypoint": {"location": {"latLng": {"latitude": origin["latitude"], "longitude": origin["longitude"]}}}}],
         "destinations": [{"waypoint": {"location": {"latLng": {"latitude": p["latitude"], "longitude": p["longitude"]}}}} for p in candidates],
@@ -210,7 +211,12 @@ async def isochrone(request: AnalyzeRequest):
         matrix_response = await client.post("https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix", json=matrix_request, headers=headers)
         if matrix_response.is_error:
             raise HTTPException(matrix_response.status_code, "Google walking route matrix request failed")
-        matrix_data = matrix_response.json()
+        try:
+            matrix_data = matrix_response.json()
+        except json.JSONDecodeError:
+            # ComputeRouteMatrix may stream one JSON element per line instead
+            # of wrapping the elements in a JSON array.
+            matrix_data = [json.loads(line) for line in matrix_response.text.splitlines() if line.strip()]
         if isinstance(matrix_data, dict):
             matrix_data = matrix_data.get("elements", [])
         for item in matrix_data:
@@ -222,7 +228,7 @@ async def isochrone(request: AnalyzeRequest):
 
         by_spoke: dict[int, list[dict]] = {i: [] for i in range(24)}
         for item in candidates:
-            if item.get("route_exists") and item.get("distance_m", 0) <= request.distance_m:
+            if item.get("route_exists") and item.get("duration_s", 0) <= request.walk_time_seconds:
                 by_spoke[item["spoke"]].append(item)
 
         semaphore = asyncio.Semaphore(6)
@@ -234,18 +240,18 @@ async def isochrone(request: AnalyzeRequest):
                         route = await google_route(client, origin, dest)
                     except (httpx.HTTPError, KeyError, ValueError):
                         continue
-                if route["distance_m"] <= request.distance_m and route["max_slope_deg"] <= request.max_slope_deg:
+                if route["duration_s"] <= request.walk_time_seconds and route["max_slope_deg"] <= request.max_slope_deg:
                     return {"spoke": spoke, "longitude": route["path"][-1][0], "latitude": route["path"][-1][1], "duration_s": route["duration_s"], "distance_m": route["distance_m"], "max_slope_deg": route["max_slope_deg"]}
             return None
 
         boundary = await asyncio.gather(*(find_spoke_edge(spoke) for spoke in range(24)))
     boundary = [point for point in boundary if point]
     if len(boundary) < 16:
-        return {"feature": None, "boundary_samples": len(boundary), "requested_samples": 24, "distance_m": request.distance_m, "max_slope_deg": request.max_slope_deg, "message": "Too few slope-safe walking directions were found to draw a reliable contour."}
+        return {"feature": None, "boundary_samples": len(boundary), "requested_samples": 24, "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg, "message": "Too few slope-safe walking directions were found to draw a reliable contour."}
     coordinates = [[point["longitude"], point["latitude"]] for point in sorted(boundary, key=lambda p: p["spoke"])]
     coordinates.append(coordinates[0])
-    feature = {"type": "Feature", "properties": {"method": "Google Routes walking matrix + slope-screened route/elevation spokes", "sample_count": len(boundary), "distance_m": request.distance_m, "max_slope_deg": request.max_slope_deg}, "geometry": {"type": "Polygon", "coordinates": [coordinates]}}
-    return {"feature": feature, "boundary_samples": len(boundary), "requested_samples": 24, "distance_m": request.distance_m, "max_slope_deg": request.max_slope_deg}
+    feature = {"type": "Feature", "properties": {"method": "Google Routes walking matrix + slope-screened route/elevation spokes", "sample_count": len(boundary), "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg}, "geometry": {"type": "Polygon", "coordinates": [coordinates]}}
+    return {"feature": feature, "boundary_samples": len(boundary), "requested_samples": 24, "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg}
 
 
 app.mount("/", StaticFiles(directory=ROOT / "static", html=True), name="site")
