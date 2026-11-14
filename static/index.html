@@ -18,7 +18,7 @@
       <span class="brand-mark"><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M4 20.8 12.1 5l4.2 8.2L19 8l5 12.8H4Z"/><path d="M9.4 20.7 13 13.8m7.1 6.9-2.7-6"/></svg></span>
       <span><strong>FIELDNOTES</strong><small>WESTERN DISTRICT · HONG KONG</small></span>
     </a>
-    <div class="top-center"><span class="live-dot"></span><span id="data-status">DEMO DATA · NOT SURVEY VERIFIED</span></div>
+  <div class="top-center"><span class="live-dot"></span><span id="data-status">LOADING HONG KONG PUBLIC DATA</span></div>
     <div class="top-right"><button class="icon-btn" id="about-btn" aria-label="About this map" title="About this map">i</button><span class="top-divider"></span><span class="edition">RESEARCH EDITION <b>01</b></span></div>
   </header>
 
@@ -37,11 +37,11 @@
       </section>
 
       <section class="controls-section">
-        <div class="section-kicker"><span class="step-no">02</span><span>WALKING THRESHOLD</span><span class="kicker-info" title="Measured along a walking route, not as a straight-line radius.">?</span></div>
-        <div class="range-title"><div><strong>Walking time</strong><small>Google Maps pedestrian routes</small></div><div class="range-value"><b id="distance-value">5</b><span>min</span></div></div>
-        <input id="distance" class="range range-distance" type="range" min="2" max="30" step="1" value="5" aria-label="Walking time threshold in minutes" />
-        <div class="range-scale"><span>2 min</span><span>30 min</span></div>
-        <div class="time-chip"><span class="clock-icon">◷</span><span><b id="walk-time">5 min</b> network travel-time contour</span></div>
+        <div class="section-kicker"><span class="step-no">02</span><span>WALKING THRESHOLD</span><span class="kicker-info" title="Measured along the mapped pedestrian route, not as a straight-line radius.">?</span></div>
+        <div class="range-title"><div><strong>Walking distance</strong><small>Along Hong Kong’s 3D pedestrian network</small></div><div class="range-value"><b id="distance-value">300</b><span>m</span></div></div>
+        <input id="distance" class="range range-distance" type="range" min="100" max="2000" step="50" value="300" aria-label="Maximum walking network distance in metres" />
+        <div class="range-scale"><span>100 m</span><span>2 km</span></div>
+        <div class="time-chip"><span class="clock-icon">◷</span><span><b id="walk-time">5 min est.</b> at a 1 m/s reference pace</span></div>
 
         <div class="slope-block">
           <div class="range-title"><div><strong>Maximum route slope</strong><small>Steepest sampled segment</small></div><div class="range-value slope-value"><b id="slope-value">10</b><span>°</span></div></div>
@@ -52,8 +52,8 @@
       </section>
 
       <section class="places-section">
-        <div class="section-kicker"><span class="step-no">03</span><span>PLACES TO EXPLORE</span><span class="place-total" id="place-total">05</span></div>
-        <div class="place-filters"><button class="filter active" data-filter="all"><span>All places</span><span id="all-count">05</span></button><button class="filter" data-filter="green"><span><i class="filter-dot green"></i>Green space</span><span id="green-count">03</span></button><button class="filter" data-filter="gym"><span><i class="filter-dot gym"></i>Outdoor fitness</span><span id="gym-count">02</span></button></div>
+        <div class="section-kicker"><span class="step-no">03</span><span>PLACES TO EXPLORE</span><span class="place-total" id="place-total">00</span></div>
+        <div class="place-filters"><button class="filter active" data-filter="all"><span>All places</span><span id="all-count">00</span></button><button class="filter" data-filter="green"><span><i class="filter-dot green"></i>Green space</span><span id="green-count">00</span></button><button class="filter" data-filter="gym"><span><i class="filter-dot gym"></i>Outdoor fitness</span><span id="gym-count">00</span></button></div>
         <div class="place-list" id="place-list"></div>
       </section>
 
@@ -67,18 +67,19 @@
       <div class="map-topline"><div class="map-context"><span class="context-mark">⌖</span><span><b>KENNEDY TOWN</b><small>WESTERN DISTRICT, HONG KONG</small></span></div><div class="map-live"><i></i> <span id="map-data-label">ILLUSTRATIVE 3D STUDY</span></div></div>
       <div class="map-controls"><button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button><button id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button><span></span><button id="reset-view" title="Reset view" aria-label="Reset view">⌖</button></div>
 
-      <div class="map-caption"><span class="caption-mark">3D</span><span><b>WALKING REACH</b><small>NETWORK TIME · ROUTES · SLOPE</small></span><span class="caption-rule"></span><span class="caption-radius"><b id="caption-distance">5</b> MIN</span></div>
+      <div class="map-caption"><span class="caption-mark">3D</span><span><b>WALKING REACH</b><small>NETWORK DISTANCE · ROUTES · SLOPE</small></span><span class="caption-rule"></span><span class="caption-radius"><b id="caption-distance">300</b> M</span></div>
 
       <div id="section-panel" class="section-panel" aria-label="3D elevation section" hidden></div>
       <div class="view-switcher"><div class="switch-copy"><span>MAP PRESENTATION</span><small>Choose how to read this place</small></div><button class="view-option selected" data-view="terrain"><span class="view-thumb thumb-terrain"><i></i></span><span><b>3D CITY</b><small>Place in context</small></span><i class="radio"></i></button><button class="view-option" data-view="diagram"><span class="view-thumb thumb-diagram"><i></i></span><span><b>3D DIAGRAM</b><small>Routes &amp; reach</small></span><i class="radio"></i></button><button class="view-option" data-view="section"><span class="view-thumb thumb-section"><i></i></span><span><b>3D SECTION</b><small>Terrain &amp; grade</small></span><i class="radio"></i></button></div>
       <div class="north-arrow">N <span>↑</span></div>
+      <a class="landsd-mark" href="https://www.landsd.gov.hk/" target="_blank" rel="noreferrer" aria-label="Lands Department, Government of Hong Kong"><span>地政總署</span><b>LANDS DEPARTMENT</b></a>
       <div class="map-attribution" id="map-attribution">OPENFREEMAP · © OPENSTREETMAP CONTRIBUTORS</div>
       <div class="map-zoom-hint">DRAG TO ORBIT <span>·</span> SCROLL TO ZOOM</div>
       <div class="toast" id="toast" role="status"></div>
     </section>
   </main>
 
-  <dialog id="about-dialog"><button class="dialog-close" aria-label="Close">×</button><div class="eyebrow">FIELDNOTES / METHOD</div><h2>Access, measured<br/><em>by the walk.</em></h2><p>This prototype compares walking routes from an approximate community-centre origin with nearby public green spaces and outdoor fitness points. Google route distances and sampled elevation are used when configured.</p><p>Grade is estimated between elevation samples. It cannot detect steps, kerbs, surface quality, crossing safety, or whether a facility is open. The points and routes currently visible are illustrative demo data and must be replaced with verified GeoInfo / CSDI records and checked in the field.</p><a href="https://data.gov.hk/en-data/dataset/hk-lcsd-facility-facility-ofe/resource/75a32704-f3d7-4a53-935e-b946fc8c8078" target="_blank" rel="noreferrer">Outdoor Fitness Equipment · DATA.GOV.HK ↗</a><div class="dialog-credit">ROUTES &amp; 3D BASEMAP: GOOGLE MAPS PLATFORM (OPTIONAL)<br/>SPATIAL PREPARATION: GEOPANDAS · EPSG:2326</div></dialog>
+  <dialog id="about-dialog"><button class="dialog-close" aria-label="Close">×</button><div class="eyebrow">FIELDNOTES / METHOD</div><h2>Access, measured<br/><em>by the walk.</em></h2><p>The map loads Hong Kong CSDI point records for public open spaces and LCSD outdoor fitness facilities around the study origin. Walking routes, lengths and elevation samples come from the Lands Department 3D Pedestrian Route service. Google Routes and Photorealistic 3D Tiles can be enabled on a separately configured backend.</p><p>The threshold is route distance (100 m–2 km), and slope is the steepest elevation change between returned 3D samples. This does not verify steps, kerbs, surface quality, crossing safety, step-free access, equipment condition, or opening hours. Public open-space points are entrance/location records, not green parcel boundaries; field verification is needed before product decisions.</p><a href="https://data.gov.hk/en-data/dataset/hk-lcsd-facility-facility-ofe" target="_blank" rel="noreferrer">Outdoor Fitness Equipment · DATA.GOV.HK ↗</a><a href="https://data.gov.hk/en-data/dataset/hk-landsd-openmap-public-open-space" target="_blank" rel="noreferrer">Public Open Space · Lands Department ↗</a><div class="dialog-credit">3D PEDESTRIAN NETWORK: LAND DEPARTMENT · CSDI<br/>3D BASEMAP: OPENFREEMAP · OPENSTREETMAP<br/>SPATIAL PREPARATION: GEOPANDAS · EPSG:2326</div></dialog>
 
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Cesium.js"></script>
   <script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.2/dist/maplibre-gl.js'"></script>

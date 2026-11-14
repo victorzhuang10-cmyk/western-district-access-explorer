@@ -37,6 +37,7 @@
 .section-mode .map-shell{background:linear-gradient(150deg,#edf0e7,#dce4d8 66%,#cbd9d3)}
 .section-mode .map-caption{z-index:4}
 .section-mode .view-switcher{z-index:5}
+.landsd-mark{position:absolute;z-index:4;left:18px;top:78px;display:flex;align-items:center;gap:8px;padding:7px 9px;background:#fffdf0ef;border:1px solid #b7bdad;color:#344336;text-decoration:none;box-shadow:0 2px 8px #1d30211a}.landsd-mark span{font:600 12px var(--ui);letter-spacing:.04em}.landsd-mark b{font:600 8px var(--mono);letter-spacing:.07em}.section-mode .landsd-mark{z-index:4}
 @media(max-width:1050px){.view-switcher{width:300px}}
 @media(max-width:760px){.view-switcher{width:300px}.section-panel{inset:60px 10px 82px;padding:12px}.section-heading{margin:0 2px 5px}.section-place-name{max-width:45%;font-size:11px}}
 @media(max-width:1050px){.map-live{font-size:9px}}

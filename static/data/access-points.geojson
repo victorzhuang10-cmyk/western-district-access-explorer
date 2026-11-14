@@ -1,11 +1,820 @@
 {
   "type": "FeatureCollection",
-  "name": "Illustrative demo access points — replace with verified GeoInfo/CSDI data",
+  "name": "Western District CSDI open-space and LCSD outdoor-fitness locations",
+  "metadata": {
+    "origin": [
+      114.1285,
+      22.2833
+    ],
+    "seed_extent_m": 2000,
+    "extent_note": "Straight-line data preparation extent only; final reach is computed along 3D pedestrian routes. Public Open Space records are mapped as their source point locations, not parcel boundaries.",
+    "retrieved": "2026-11-15"
+  },
   "features": [
-    {"type":"Feature","id":"green-1","properties":{"name":"Cadogan Street Garden","kind":"green","source":"Illustrative demo point","demo":true},"geometry":{"type":"Point","coordinates":[114.1280,22.2843]}},
-    {"type":"Feature","id":"green-2","properties":{"name":"Smithfield Sitting-out Area","kind":"green","source":"Illustrative demo point","demo":true},"geometry":{"type":"Point","coordinates":[114.1305,22.2824]}},
-    {"type":"Feature","id":"green-3","properties":{"name":"Belcher Bay Promenade","kind":"green","source":"Illustrative demo point","demo":true},"geometry":{"type":"Point","coordinates":[114.1247,22.2846]}},
-    {"type":"Feature","id":"gym-1","properties":{"name":"Kennedy Town Outdoor Fitness Station","kind":"gym","source":"Illustrative demo point","demo":true},"geometry":{"type":"Point","coordinates":[114.1262,22.2817]}},
-    {"type":"Feature","id":"gym-2","properties":{"name":"Sai Woo Lane Fitness Corner","kind":"gym","source":"Illustrative demo point","demo":true},"geometry":{"type":"Point","coordinates":[114.1312,22.2850]}}
+    {
+      "type": "Feature",
+      "id": "ofe-1",
+      "properties": {
+        "name": "Belcher Bay Park",
+        "name_zh": "卑路乍灣公園",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "Kennedy Town Praya, Sai Wan",
+        "equipment_types": [
+          "FS"
+        ],
+        "equipment_type_names": [
+          "Fitness Station"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/1951_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 242
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.130278,
+          22.284722
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ofe-2",
+      "properties": {
+        "name": "Cadogan Street Temporary Garden",
+        "name_zh": "加多近街臨時花園",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "J/O Cadogan Street and Victoria Road, Kennedy Town, Sai Wan",
+        "equipment_types": [
+          "EFC"
+        ],
+        "equipment_type_names": [
+          "Elderly Fitness Corner"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/1460_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 273
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.126111,
+          22.282222
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ofe-3",
+      "properties": {
+        "name": "Caine Road Garden",
+        "name_zh": "堅道花園",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "Caine Road, Mid-level",
+        "equipment_types": [
+          "FC"
+        ],
+        "equipment_type_names": [
+          "Fitness Corner"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/2017_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 1984
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.147778,
+          22.283056
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ofe-4",
+      "properties": {
+        "name": "Hatton Road Sitting-out Area",
+        "name_zh": "克頓道休憩處",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "Hatton Road, Mid-level",
+        "equipment_types": [
+          "EFC"
+        ],
+        "equipment_type_names": [
+          "Elderly Fitness Corner"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/1462_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 1138
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.138333,
+          22.278611
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ofe-5",
+      "properties": {
+        "name": "High West Picnic Area",
+        "name_zh": "高西郊遊區",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "Harlech Road junction of Lugard Road, The Peak",
+        "equipment_types": [
+          "EFC",
+          "FC"
+        ],
+        "equipment_type_names": [
+          "Elderly Fitness Corner",
+          "Fitness Corner"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/1463_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 1604
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.139167,
+          22.272778
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ofe-6",
+      "properties": {
+        "name": "Hill Road Rest Garden",
+        "name_zh": "山道休憩花園",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "J/O Hill Road and South Lane, Shek Tong Tsui, Sai Wan",
+        "equipment_types": [
+          "EFC"
+        ],
+        "equipment_type_names": [
+          "Elderly Fitness Corner"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/1464_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 731
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.135278,
+          22.285278
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ofe-7",
+      "properties": {
+        "name": "Ka Wai Man Road Garden",
+        "name_zh": "加惠民道花園",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "Ka Wai Man Road, Kennedy Town, Sai Wan",
+        "equipment_types": [
+          "EFC"
+        ],
+        "equipment_type_names": [
+          "Elderly Fitness Corner"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/1467_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 372
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.12534,
+          22.28167
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ofe-8",
+      "properties": {
+        "name": "Kennedy Town Playground",
+        "name_zh": "堅尼地城遊樂場",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "J/O Forbes Street & Smithfield, Kennedy Town, Sai Wan",
+        "equipment_types": [
+          "EFC"
+        ],
+        "equipment_type_names": [
+          "Elderly Fitness Corner"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/1469_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 291
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.126944,
+          22.281111
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ofe-9",
+      "properties": {
+        "name": "Kennedy Town Service Reservoir Playground",
+        "name_zh": "堅尼地城配水庫遊樂場",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "Mount Davis Road, Kennedy Town, Sai Wan",
+        "equipment_types": [
+          "FC"
+        ],
+        "equipment_type_names": [
+          "Fitness Corner"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/2019_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 478
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.127222,
+          22.279167
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ofe-10",
+      "properties": {
+        "name": "King George V Memorial Park, Hong Kong",
+        "name_zh": "香港佐治五世紀念公園",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "J/O Eastern Street and High Street, Sai Ying Pun, Sai Wan",
+        "equipment_types": [
+          "EFC"
+        ],
+        "equipment_type_names": [
+          "Elderly Fitness Corner"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/1470_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 1631
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.144167,
+          22.285556
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ofe-11",
+      "properties": {
+        "name": "Li Sing Street Playground",
+        "name_zh": "李陞街遊樂場",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "Li Sing Street, Sai Ying Pun, Sai Wan",
+        "equipment_types": [
+          "EFC"
+        ],
+        "equipment_type_names": [
+          "Elderly Fitness Corner"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/1471_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 1801
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.145556,
+          22.286944
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ofe-12",
+      "properties": {
+        "name": "Mount Davis Playground",
+        "name_zh": "摩星嶺遊樂場",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "Mount Davis Path, Mount Davis, Kennedy Town, Sai Wan",
+        "equipment_types": [
+          "FC"
+        ],
+        "equipment_type_names": [
+          "Fitness Corner"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/2020_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 876
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.1234,
+          22.27699
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ofe-13",
+      "properties": {
+        "name": "Mount Davis Service Reservoir Sitting-out Area",
+        "name_zh": "摩星嶺配水庫休憩處",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "Mount Davis Fresh Water Service Reservoir, Mount Davis, Kennedy Town, Sai Wan",
+        "equipment_types": [
+          "FC"
+        ],
+        "equipment_type_names": [
+          "Fitness Corner"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/2021_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 1191
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.12356,
+          22.27361
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ofe-14",
+      "properties": {
+        "name": "Rose Lane Children's Playground",
+        "name_zh": "玫瑰里兒童遊樂場",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "Rose Lane, Sai Ying Pun, Sai Wan",
+        "equipment_types": [
+          "EFC"
+        ],
+        "equipment_type_names": [
+          "Elderly Fitness Corner"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/1473_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 1154
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.139444,
+          22.285556
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ofe-15",
+      "properties": {
+        "name": "Sai Ning Street Garden",
+        "name_zh": "西寧街花園",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "Sai Ning Street, Kennedy Town, Sai Wan",
+        "equipment_types": [
+          "EFC"
+        ],
+        "equipment_type_names": [
+          "Elderly Fitness Corner"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/1474_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 765
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.12132,
+          22.28153
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ofe-16",
+      "properties": {
+        "name": "Sai On Lane Children's Playground",
+        "name_zh": "西安里兒童遊樂場",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "Sai On Lane, Shek Tong Tsui, Sai Wan",
+        "equipment_types": [
+          "EFC"
+        ],
+        "equipment_type_names": [
+          "Elderly Fitness Corner"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/1475_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 1063
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.138056,
+          22.286944
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ofe-17",
+      "properties": {
+        "name": "Smithfield Sitting-out Area",
+        "name_zh": "士美非路休憩處",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "Forbes Street East, Kennedy Town, Sai Wan",
+        "equipment_types": [
+          "EFC"
+        ],
+        "equipment_type_names": [
+          "Elderly Fitness Corner"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/1476_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 231
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.12914,
+          22.28131
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ofe-18",
+      "properties": {
+        "name": "Sun Yat Sen Memorial Park",
+        "name_zh": "中山紀念公園",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "Eastern Street North, Sai Ying Pun, Sai Wan",
+        "equipment_types": [
+          "EFC",
+          "FC"
+        ],
+        "equipment_type_names": [
+          "Elderly Fitness Corner",
+          "Fitness Corner"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/1477_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 1815
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.144722,
+          22.289722
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ofe-19",
+      "properties": {
+        "name": "Third Street Playground",
+        "name_zh": "第三街遊樂場",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "Third Street Near Yau Yee Lane, Sai Ying Pun, Sai Wan",
+        "equipment_types": [
+          "EFC"
+        ],
+        "equipment_type_names": [
+          "Elderly Fitness Corner"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/1478_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 1015
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.138056,
+          22.285556
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ofe-20",
+      "properties": {
+        "name": "West End Park",
+        "name_zh": "城西公園",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "J/O Lyttelton Road and Oaklands Path, Mid-level",
+        "equipment_types": [
+          "EFC"
+        ],
+        "equipment_type_names": [
+          "Elderly Fitness Corner"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/1480_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 1498
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.143056,
+          22.283611
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "ofe-21",
+      "properties": {
+        "name": "Whitty Street Children's Playground",
+        "name_zh": "屈地街兒童遊樂場",
+        "kind": "gym",
+        "district": "Central & Western",
+        "address": "Whitty Street, Shek Tong Tsui, Sai Wan",
+        "equipment_types": [
+          "EFC"
+        ],
+        "equipment_type_names": [
+          "Elderly Fitness Corner"
+        ],
+        "photo_url": "https://www.lcsd.gov.hk/file_upload_clpss/leisure_facilities/en/common/images/facilities/facilitieslist/fitness/1481_1.jpg",
+        "source": "LCSD Outdoor Fitness Equipment via CSDI / data.gov.hk",
+        "source_updated": "2024-12-23",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670389505454_91091&format=geojson&layer_name=geotagging",
+        "study_extent_distance_m": 881
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.136389,
+          22.286389
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "pos-2",
+      "properties": {
+        "name": "Sai Ying Pun MTR Station (Exit B)",
+        "name_zh": "港鐵西營盤站B出口",
+        "kind": "green",
+        "address": "First Street, Sai Ying Pun, Hong Kong",
+        "address_zh": "香港西營盤第一街",
+        "accessibility_status": "Barrier-free-access facilities available",
+        "accessibility_status_zh": "提供無障礙通道設施",
+        "source": "Lands Department Public Open Space via CSDI / data.gov.hk",
+        "source_updated": "20230531162333",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=landsd_rcd_1637304969323_68704&format=geojson&layer_name=POS",
+        "study_extent_distance_m": 1406
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.1417575692,
+          22.2863636676
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "pos-30",
+      "properties": {
+        "name": "The University of Hong Kong Jockey Club Student Village III (Open Space - 2)",
+        "name_zh": "香港大學賽馬會第三學生村(休憩空間-2)",
+        "kind": "green",
+        "address": "9 Lung Wah Street",
+        "address_zh": "龍華街9號",
+        "accessibility_status": "Barrier-free-access facilities available",
+        "accessibility_status_zh": "提供無障礙通道設施",
+        "source": "Lands Department Public Open Space via CSDI / data.gov.hk",
+        "source_updated": "20211130151240",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=landsd_rcd_1637304969323_68704&format=geojson&layer_name=POS",
+        "study_extent_distance_m": 512
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.1294938,
+          22.2787915435
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "pos-46",
+      "properties": {
+        "name": "Island Crest",
+        "name_zh": "縉城峰",
+        "kind": "green",
+        "address": "8 First Street",
+        "address_zh": "第一街8號",
+        "accessibility_status": "Barrier-free-access facilities available",
+        "accessibility_status_zh": "提供無障礙通道設施",
+        "source": "Lands Department Public Open Space via CSDI / data.gov.hk",
+        "source_updated": "20211130151237",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=landsd_rcd_1637304969323_68704&format=geojson&layer_name=POS",
+        "study_extent_distance_m": 1517
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.1429053733,
+          22.2862199732
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "pos-69",
+      "properties": {
+        "name": "The Belcher’s",
+        "name_zh": "寶翠園",
+        "kind": "green",
+        "address": "89 Pok Fu Lam Road /8 Belcher’s Street",
+        "address_zh": "薄扶林道89號/卑路乍街8號",
+        "accessibility_status": "Barrier-free-access facilities not available",
+        "accessibility_status_zh": "沒有提供無障礙通道設施",
+        "source": "Lands Department Public Open Space via CSDI / data.gov.hk",
+        "source_updated": "20211130151233",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=landsd_rcd_1637304969323_68704&format=geojson&layer_name=POS",
+        "study_extent_distance_m": 622
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.1341104994,
+          22.285394217
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "pos-71",
+      "properties": {
+        "name": "The University of Hong Kong Jockey Club Student Village III (Open Space - 1)",
+        "name_zh": "香港大學賽馬會第三學生村(休憩空間-1)",
+        "kind": "green",
+        "address": "9 Lung Wah Street",
+        "address_zh": "龍華街9號",
+        "accessibility_status": "Barrier-free-access facilities available",
+        "accessibility_status_zh": "提供無障礙通道設施",
+        "source": "Lands Department Public Open Space via CSDI / data.gov.hk",
+        "source_updated": "20211130151232",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=landsd_rcd_1637304969323_68704&format=geojson&layer_name=POS",
+        "study_extent_distance_m": 475
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.1297653555,
+          22.2791889704
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "pos-90",
+      "properties": {
+        "name": "The Sail at Victoria",
+        "name_zh": "傲翔灣畔",
+        "kind": "green",
+        "address": "Sai Ning Street",
+        "address_zh": "西寧街",
+        "accessibility_status": "Barrier-free-access facilities available",
+        "accessibility_status_zh": "提供無障礙通道設施",
+        "source": "Lands Department Public Open Space via CSDI / data.gov.hk",
+        "source_updated": "20211130151228",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=landsd_rcd_1637304969323_68704&format=geojson&layer_name=POS",
+        "study_extent_distance_m": 890
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.1201486854,
+          22.2811997299
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "pos-92",
+      "properties": {
+        "name": "The Nova",
+        "name_zh": "星鑽",
+        "kind": "green",
+        "address": "88 Third Street",
+        "address_zh": "第三街88號",
+        "accessibility_status": "Barrier-free-access facilities available",
+        "accessibility_status_zh": "提供無障礙通道設施",
+        "source": "Lands Department Public Open Space via CSDI / data.gov.hk",
+        "source_updated": "20211130151228",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=landsd_rcd_1637304969323_68704&format=geojson&layer_name=POS",
+        "study_extent_distance_m": 1349
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.141407606,
+          22.2854501569
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "pos-93",
+      "properties": {
+        "name": "La Maison Du Nord",
+        "name_zh": "采逸軒",
+        "kind": "green",
+        "address": "12 North Street",
+        "address_zh": "北街12號",
+        "accessibility_status": "Barrier-free-access facilities available",
+        "accessibility_status_zh": "提供無障礙通道設施",
+        "source": "Lands Department Public Open Space via CSDI / data.gov.hk",
+        "source_updated": "20211130151227",
+        "source_url": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=landsd_rcd_1637304969323_68704&format=geojson&layer_name=POS",
+        "study_extent_distance_m": 51
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.1288325612,
+          22.2829635026
+        ]
+      }
+    }
   ]
 }

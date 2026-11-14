@@ -1,20 +1,16 @@
-const DEMO_PLACES = [
-  { id: 'green-1', name: 'Cadogan Street Garden', kind: 'green', distance_m: 260, max_slope_deg: 4.5, minutes: 4, duration_s: 240, xy: [540, 404], bend: [535, 442] },
-  { id: 'green-2', name: 'Smithfield Sitting-out Area', kind: 'green', distance_m: 410, max_slope_deg: 8.7, minutes: 7, duration_s: 420, xy: [686, 424], bend: [639, 425] },
-  { id: 'green-3', name: 'Belcher Bay Promenade', kind: 'green', distance_m: 575, max_slope_deg: 12.5, minutes: 10, duration_s: 600, xy: [481, 545], bend: [515, 503] },
-  { id: 'gym-1', name: 'Kennedy Town Outdoor Fitness Station', kind: 'gym', distance_m: 330, max_slope_deg: 6.1, minutes: 6, duration_s: 360, xy: [619, 548], bend: [581, 528] },
-  { id: 'gym-2', name: 'Sai Woo Lane Fitness Corner', kind: 'gym', distance_m: 520, max_slope_deg: 15.5, minutes: 9, duration_s: 540, xy: [704, 354], bend: [648, 382] },
-];
 const ORIGIN = { latitude: 22.2833, longitude: 114.1285 };
 const $ = (id) => document.getElementById(id);
 const apiUrl = (path) => new URL(`${location.pathname.includes('/static/') ? '../' : './'}api/${path}`, document.baseURI).toString();
-const state = { timeMinutes: 5, slope: 10, filter: 'all', view: 'terrain', places: structuredClone(DEMO_PLACES), google: false, isochrone: null, sectionPlaceId: 'green-1', map: null, maplibre: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false };
+const staticUrl = (path) => new URL(`${location.pathname.includes('/static/') ? './' : './static/'}${path}`, document.baseURI).toString();
+const state = { timeMinutes: 5, slope: 10, filter: 'all', view: 'terrain', places: [], google: false, isochrone: null, sectionPlaceId: null, map: null, maplibre: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, routeFailures: new Set() };
 
 function formatDistance(m) { return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`; }
-function durationMinutes(p) { return p.duration_s != null ? p.duration_s / 60 : Number(p.minutes || 0); }
-function accessible(p) { return p.googleAnalysis ? Boolean(p.accessible) : durationMinutes(p) <= state.timeMinutes && Number(p.max_slope_deg || 0) <= state.slope; }
+function durationMinutes(p) { return p.duration_s != null ? p.duration_s / 60 : null; }
+function accessible(p) { return Boolean(p.routeAnalysis && p.route_exists !== false && Number(p.distance_m) <= state.distanceMetres && Number(p.max_slope_deg) <= state.slope && p.accessible !== false); }
 function status(p) {
-  if (durationMinutes(p) > state.timeMinutes) return ['OVER TIME', 'outside'];
+  if (!p.routeAnalysis) return [p.routeError ? 'ROUTE UNAVAILABLE' : 'ROUTE PENDING', 'pending'];
+  if (p.route_exists === false) return ['NO WALK ROUTE', 'outside'];
+  if (Number(p.distance_m) > state.distanceMetres) return ['OVER DISTANCE', 'outside'];
   if (Number(p.max_slope_deg || 0) > state.slope) return [`${Number(p.max_slope_deg).toFixed(1)}° SLOPE`, 'steep'];
   return ['IN REACH', ''];
 }
@@ -24,22 +20,24 @@ function updateSliderPaint(input) {
   input.style.background = `linear-gradient(to right,${color} 0%,${color} ${pct}%,#dcded5 ${pct}%,#dcded5 100%)`;
 }
 function setRange() {
-  state.timeMinutes = Number($('distance').value); state.slope = Number($('slope').value); state.isochrone = null;
-  $('distance-value').textContent = state.timeMinutes; $('slope-value').textContent = state.slope;
-  $('caption-distance').textContent = state.timeMinutes;
-  $('walk-time').textContent = `${state.timeMinutes} min`;
+  state.distanceMetres = Number($('distance').value); state.slope = Number($('slope').value); state.isochrone = null;
+  $('distance-value').textContent = state.distanceMetres; $('slope-value').textContent = state.slope;
+  $('caption-distance').textContent = state.distanceMetres;
+  $('walk-time').textContent = `${Math.round(state.distanceMetres / 60)} min est.`;
   updateSliderPaint($('distance')); updateSliderPaint($('slope'));
   render();
   if (state.google) scheduleGoogleAnalysis();
-  else renderMapLibreOverlays();
+  else { renderMapLibreOverlays(); scheduleLandsDAnalysis(); }
 }
 function renderList() {
   const visible = state.places.filter(p => state.filter === 'all' || p.kind === state.filter);
   $('place-list').innerHTML = visible.map(p => {
     const [label, cls] = status(p);
     const icon = p.kind === 'green' ? '♧' : '✳';
-    const extra = `${Math.max(1, Math.round(durationMinutes(p)))} min walk${p.max_slope_deg != null ? ` · ${Number(p.max_slope_deg).toFixed(1)}° max` : ''}`;
-    return `<div class="place-item ${accessible(p) ? 'is-accessible' : ''}" data-id="${p.id}"><span class="place-icon ${p.kind}">${icon}</span><span class="place-info"><strong>${p.name}</strong><small>${extra}</small></span><span class="place-status ${cls}">${label}</span></div>`;
+    const extra = p.routeAnalysis
+      ? `${Math.max(1, Math.round(durationMinutes(p)))} min · ${formatDistance(p.distance_m)} walking · ${Number(p.max_slope_deg).toFixed(1)}° max`
+      : `CSDI location · ${formatDistance(p.study_distance_m)} study distance`;
+    return `<div class="place-item ${accessible(p) ? 'is-accessible' : ''}" data-id="${escapeHtml(p.id)}"><span class="place-icon ${p.kind}">${icon}</span><span class="place-info"><strong>${escapeHtml(p.name)}</strong><small>${escapeHtml(extra)}</small></span><span class="place-status ${cls}">${escapeHtml(label)}</span></div>`;
   }).join('');
   $('place-total').textContent = String(state.places.length).padStart(2, '0');
   $('all-count').textContent = String(state.places.length).padStart(2, '0');
@@ -58,7 +56,7 @@ function pinMarkup(p) {
   const cls = p.kind === 'green' ? 'green-dot' : 'gym-dot';
   const glyph = p.kind === 'green' ? '♧' : '✳';
   const [label, statusClass] = status(p);
-  const opacity = durationMinutes(p) > state.timeMinutes || Number(p.max_slope_deg) > state.slope ? '.48' : '1';
+  const opacity = Number(p.distance_m) > state.distanceMetres || Number(p.max_slope_deg) > state.slope ? '.48' : '1';
   return `<g class="place-pin" data-id="${p.id}" opacity="${opacity}" transform="translate(${x} ${y})"><circle class="pin-halo" r="15"/><circle class="pin-dot ${cls}" r="9"/><text text-anchor="middle" y="3.5" fill="white" font-size="10">${glyph}</text><text class="pin-label" x="13" y="-8">${p.name}</text>${statusClass === 'steep' ? `<text x="13" y="7" fill="#a24634" font-size="8" font-family="DM Mono">SLOPE ${p.max_slope_deg.toFixed(1)}°</text>` : ''}</g>`;
 }
 function render() { renderList(); renderCesiumOverlays(); renderMapLibreOverlays(); renderSectionMap(); }
@@ -71,27 +69,30 @@ function pointFromFeature(feature) {
 }
 async function loadAccessPoints() {
   try {
-    const collection = await fetch(apiUrl('access-points')).then(r => { if (!r.ok) throw new Error('GeoJSON not available'); return r.json(); });
+    const collection = await fetch(staticUrl('data/access-points.geojson')).then(r => { if (!r.ok) throw new Error('CSDI GeoJSON not available'); return r.json(); });
     const loaded = (collection.features || []).map((feature, i) => {
       const coordinates = pointFromFeature(feature); if (!coordinates) return null;
       const properties = feature.properties || {};
       const kind = properties.kind === 'gym' || /fitness|exercise|gym/i.test(String(properties.kind || properties.facility_type || properties.category || '')) ? 'gym' : 'green';
       const id = String(feature.id || properties.id || `${kind}-${i + 1}`);
       const dlon = coordinates[0] - ORIGIN.longitude, dlat = coordinates[1] - ORIGIN.latitude;
-      return { id, name: String(properties.name || properties.name_en || properties.facility_name_en || properties.facility_name || `Public ${kind === 'gym' ? 'fitness point' : 'green space'} ${i + 1}`), kind, coordinates, distance_m: Math.round(Math.hypot(dlon * 102000, dlat * 111000) * 1.22), max_slope_deg: 0, minutes: 0, xy: [590 + dlon * 10000, 470 - dlat * 12500], bend: [590 + dlon * 5200, 470 - dlat * 7400], demo: properties.demo === true };
+      return { ...properties, id, name: String(properties.name || `Public ${kind === 'gym' ? 'fitness point' : 'open space'} ${i + 1}`), kind, coordinates, study_distance_m: Number(properties.study_extent_distance_m || Math.hypot(dlon * 102000, dlat * 111000)) };
     }).filter(Boolean);
     if (!loaded.length) return;
     state.places = loaded; render();
-    if (loaded.some(p => !p.demo)) { $('data-status').textContent = 'HONG KONG OPEN DATA · ROUTES PENDING'; $('map-data-label').textContent = 'HONG KONG OPEN DATA LAYERS'; }
-  } catch (error) { console.info('Using bundled illustrative access points.', error.message); }
+    $('data-status').textContent = `CSDI HONG KONG DATA · ${loaded.length} LOCATIONS`;
+    $('map-data-label').textContent = 'CSDI LOCATIONS · ROUTES PENDING';
+    state.sectionPlaceId = loaded[0]?.id || null;
+    render();
+  } catch (error) { $('data-status').textContent = 'HONG KONG DATA UNAVAILABLE'; console.error('Could not load CSDI access locations.', error); }
 }
 function focusPlace(id) {
   const place = state.places.find(p => p.id === id); if (!place) return;
   state.sectionPlaceId = id;
   renderSectionMap();
   $('place-list').querySelector(`[data-id="${id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  showToast(`${place.name} · ${Math.max(1, Math.round(durationMinutes(place)))} min walking route`);
-  const coordinates = place.coordinates || coordsForDemo(place).at(-1).slice(0, 2);
+  showToast(place.routeAnalysis ? `${place.name} · ${Math.max(1, Math.round(durationMinutes(place)))} min walking route` : `${place.name} · walking route is pending`);
+  const coordinates = place.coordinates;
   if (state.map && coordinates) state.map.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(coordinates[0], coordinates[1], 950), duration: 1.2 });
   if (state.maplibre && coordinates) state.maplibre.flyTo({ center: coordinates, zoom: 17, pitch: 48, duration: 1000 });
 }
@@ -117,11 +118,6 @@ function setView(mode) {
     if (mode !== 'section') state.maplibre.flyTo({ center: state.maplibre.getCenter(), zoom: mode === 'terrain' ? 15.6 : 16.2, pitch: mode === 'terrain' ? 48 : 42, bearing: mode === 'terrain' ? -17 : 0, duration: 700 });
   }
 }
-function coordsForDemo(p) {
-  const origin = [114.1285, 22.2833, 24];
-  const deltas = { 'green-1': [-.0004, .0008], 'green-2': [.0012, .0004], 'green-3': [-.0012, -.0011], 'gym-1': [.0005, -.0008], 'gym-2': [.0018, .0010] }[p.id] || [0, 0];
-  return [[origin[0], origin[1], 24], [origin[0] + deltas[0] * .45, origin[1] + deltas[1] * .6, 28], [origin[0] + deltas[0], origin[1] + deltas[1], 22]];
-}
 function renderCesiumOverlays() {
   if (!state.map) return;
   for (const entity of [...state.routeEntities, ...state.markerEntities]) state.map.entities.remove(entity);
@@ -134,8 +130,8 @@ function renderCesiumOverlays() {
     state.routeEntities.push(state.map.entities.add({ polygon: { hierarchy: Cesium.Cartesian3.fromDegreesArray(contour), material: Cesium.Color.fromCssColorString('#cb5237').withAlpha(.18), outline: true, outlineColor: Cesium.Color.fromCssColorString('#cb5237').withAlpha(.9), outlineWidth: 2, height: 8 } }));
   }
   for (const p of state.places) {
-    if (!accessible(p)) continue;
-    const path = p.path?.length ? p.path : coordsForDemo(p);
+    if (!accessible(p) || !p.path?.length) continue;
+    const path = p.path;
     const pos = path.map(c => Cesium.Cartesian3.fromDegrees(c[0], c[1], c[2] ?? 20));
     const route = state.map.entities.add({ polyline: { positions: pos, width: 4, material: Cesium.Color.fromCssColorString('#276d5d'), clampToGround: false } });
     state.routeEntities.push(route);
@@ -144,29 +140,13 @@ function renderCesiumOverlays() {
     state.markerEntities.push(marker);
   }
 }
-function circleFeature(center, radius) {
-  const [lng, lat] = center, points = [];
-  for (let i = 0; i <= 72; i++) {
-    const bearing = i * 5 * Math.PI / 180, angular = radius / 6371008.8;
-    const p1 = lat * Math.PI / 180, l1 = lng * Math.PI / 180;
-    const p2 = Math.asin(Math.sin(p1) * Math.cos(angular) + Math.cos(p1) * Math.sin(angular) * Math.cos(bearing));
-    const l2 = l1 + Math.atan2(Math.sin(bearing) * Math.sin(angular) * Math.cos(p1), Math.cos(angular) - Math.sin(p1) * Math.sin(p2));
-    points.push([l2 * 180 / Math.PI, p2 * 180 / Math.PI]);
-  }
-  return { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [points] } };
-}
-function demoRoute(p) {
-  const end = p.coordinates || coordsForDemo(p).at(-1).slice(0, 2);
-  const midLng = (ORIGIN.longitude + end[0]) / 2, midLat = (ORIGIN.latitude + end[1]) / 2;
-  const bend = (p.id.charCodeAt(0) % 2 ? 1 : -1) * .00012;
-  return [[ORIGIN.longitude, ORIGIN.latitude], [midLng + bend, midLat - bend], [end[0], end[1]]];
-}
 function mapLibreLayersReady() { return state.maplibre && state.maplibre.isStyleLoaded() && state.maplibre.getSource('access-routes'); }
 function renderSectionMap() {
   const host = $('section-panel'); if (!host) return;
   const place = state.places.find(p => p.id === state.sectionPlaceId) || state.places.find(accessible) || state.places[0];
-  if (!place) { host.innerHTML = '<div class="section-empty">Select a place to inspect its route section.</div>'; return; }
-  const path = place.path?.length ? place.path : coordsForDemo(place);
+  if (!place) { host.innerHTML = '<div class="section-empty">CSDI destination locations are loading.</div>'; return; }
+  if (!place.routeAnalysis || !place.path?.length) { host.innerHTML = `<div class="section-empty">${escapeHtml(place.name)}<br/><small>Request a route to see the 3D elevation profile. The profile uses Lands Department 3D pedestrian-network heights.</small></div>`; return; }
+  const path = place.path;
   const distances = [0];
   for (let i = 1; i < path.length; i++) {
     const dx = (path[i][0] - path[i - 1][0]) * 102000, dy = (path[i][1] - path[i - 1][1]) * 111000;
@@ -181,17 +161,17 @@ function renderSectionMap() {
   const top = profile.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
   const first = profile[0], last = profile.at(-1), accepted = accessible(place);
   const gradeText = `${Number(place.max_slope_deg || 0).toFixed(1)}° max grade`;
-  const isGoogle = Boolean(place.googleAnalysis && place.elevations?.length);
+  const routeSource = escapeHtml(place.route_source || 'Lands Department 3D pedestrian network');
   const markers = profile.filter((_, i) => i === 0 || i === profile.length - 1 || i % Math.max(1, Math.floor(profile.length / 7)) === 0).map((p, i) => `<circle cx="${p.x}" cy="${p.y}" r="${i === 0 || p === last ? 8 : 4}" fill="${i === 0 ? '#c94f37' : p === last ? '#287461' : '#f9f8f1'}" stroke="${i === 0 ? '#fff' : '#287461'}" stroke-width="3"/>`).join('');
-  const lines = `<svg viewBox="0 0 960 520" role="img" aria-label="Terrain section from the community centre to ${escapeHtml(place.name)}"><defs><linearGradient id="sectionGround" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d6bd"/><stop offset="1" stop-color="#e7e6d9"/></linearGradient><linearGradient id="sectionCut" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#aabd9e"/><stop offset="1" stop-color="#738a75"/></linearGradient></defs><path d="M76 255 840 212 918 264 151 315Z" fill="#ebeee2" stroke="#adb8a5"/><path d="M151 315 918 264 918 351 151 405Z" fill="#d4d8ca" stroke="#adb8a5"/><path d="M${top} L${last.x.toFixed(1)} ${(last.y + 112).toFixed(1)} L${first.x.toFixed(1)} ${(first.y + 112).toFixed(1)}Z" fill="url(#sectionCut)" stroke="#667c68" stroke-width="2"/><path d="M${top}" fill="none" stroke="#f7f7ed" stroke-width="17" stroke-linejoin="round"/><path d="M${top}" fill="none" stroke="${accepted ? '#176d5a' : '#bb4c37'}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>${markers}<path d="M102 416h750" stroke="#858e83" stroke-dasharray="5 7"/><path d="M102 408v16m750-16v16" stroke="#858e83"/><text x="102" y="449" class="section-svg-label">0 m · COMMUNITY CENTRE</text><text x="850" y="449" text-anchor="end" class="section-svg-label">${escapeHtml(formatDistance(place.distance_m || total))} · ${escapeHtml(place.name)}</text><text x="76" y="242" class="section-svg-label">ELEVATION</text><text x="76" y="260" class="section-svg-small">${Math.round(minElevation)} m</text><text x="76" y="282" class="section-svg-small">${Math.round(maxElevation)} m</text><rect x="625" y="82" width="234" height="44" rx="3" fill="#fffdf6" stroke="#dadbd2"/><circle cx="647" cy="104" r="6" fill="${accepted ? '#287461' : '#bd4c38'}"/><text x="663" y="109" class="section-svg-label">${accepted ? 'WITHIN WALKING THRESHOLD' : 'OUTSIDE ACCESS THRESHOLD'}</text><text x="122" y="478" class="section-svg-small">VERTICAL RELIEF EXAGGERATED · ${isGoogle ? 'GOOGLE ELEVATION SAMPLES' : 'ILLUSTRATIVE DEMO PROFILE'}</text><text x="840" y="478" text-anchor="end" class="section-svg-label">${gradeText} · ${Math.max(1, Math.round(durationMinutes(place)))} min</text></svg>`;
+  const lines = `<svg viewBox="0 0 960 520" role="img" aria-label="Terrain section from the community centre to ${escapeHtml(place.name)}"><defs><linearGradient id="sectionGround" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d6bd"/><stop offset="1" stop-color="#e7e6d9"/></linearGradient><linearGradient id="sectionCut" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#aabd9e"/><stop offset="1" stop-color="#738a75"/></linearGradient></defs><path d="M76 255 840 212 918 264 151 315Z" fill="#ebeee2" stroke="#adb8a5"/><path d="M151 315 918 264 918 351 151 405Z" fill="#d4d8ca" stroke="#adb8a5"/><path d="M${top} L${last.x.toFixed(1)} ${(last.y + 112).toFixed(1)} L${first.x.toFixed(1)} ${(first.y + 112).toFixed(1)}Z" fill="url(#sectionCut)" stroke="#667c68" stroke-width="2"/><path d="M${top}" fill="none" stroke="#f7f7ed" stroke-width="17" stroke-linejoin="round"/><path d="M${top}" fill="none" stroke="${accepted ? '#176d5a' : '#bb4c37'}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>${markers}<path d="M102 416h750" stroke="#858e83" stroke-dasharray="5 7"/><path d="M102 408v16m750-16v16" stroke="#858e83"/><text x="102" y="449" class="section-svg-label">0 m · COMMUNITY CENTRE</text><text x="850" y="449" text-anchor="end" class="section-svg-label">${escapeHtml(formatDistance(place.distance_m || total))} · ${escapeHtml(place.name)}</text><text x="76" y="242" class="section-svg-label">ELEVATION</text><text x="76" y="260" class="section-svg-small">${Math.round(minElevation)} m</text><text x="76" y="282" class="section-svg-small">${Math.round(maxElevation)} m</text><rect x="625" y="82" width="234" height="44" rx="3" fill="#fffdf6" stroke="#dadbd2"/><circle cx="647" cy="104" r="6" fill="${accepted ? '#287461' : '#bd4c38'}"/><text x="663" y="109" class="section-svg-label">${accepted ? 'WITHIN WALKING THRESHOLD' : 'OUTSIDE ACCESS THRESHOLD'}</text><text x="122" y="478" class="section-svg-small">3D NETWORK ELEVATION · ${routeSource}</text><text x="840" y="478" text-anchor="end" class="section-svg-label">${gradeText} · ${Math.max(1, Math.round(durationMinutes(place)))} min</text></svg>`;
   host.innerHTML = `<div class="section-heading"><span><b>ROUTE SECTION</b><small>Cutaway profile to the selected place</small></span><span class="section-place-name">${escapeHtml(place.name)}</span></div>${lines}`;
 }
 function renderMapLibreOverlays() {
   const map = state.maplibre; if (!map || !map.getSource('access-routes')) return;
   const inReach = state.places.filter(p => accessible(p) && (state.filter === 'all' || p.kind === state.filter));
-  const routes = inReach.map(p => ({ type: 'Feature', properties: { id: p.id, name: p.name, kind: p.kind }, geometry: { type: 'LineString', coordinates: p.path?.length ? p.path.map(c => c.slice(0, 2)) : demoRoute(p) } }));
-  const places = inReach.filter(p => p.coordinates || p.id.startsWith('green-') || p.id.startsWith('gym-')).map(p => {
-    const position = p.coordinates || (coordsForDemo(p).at(-1).slice(0, 2));
+  const routes = inReach.filter(p => p.path?.length).map(p => ({ type: 'Feature', properties: { id: p.id, name: p.name, kind: p.kind }, geometry: { type: 'LineString', coordinates: p.path.map(c => c.slice(0, 2)) } }));
+  const places = inReach.filter(p => p.coordinates).map(p => {
+    const position = p.coordinates;
     return { type: 'Feature', properties: { id: p.id, name: p.name, kind: p.kind }, geometry: { type: 'Point', coordinates: position } };
   });
   const routeData = { type: 'FeatureCollection', features: routes };
@@ -202,12 +182,73 @@ function renderMapLibreOverlays() {
   renderMapLibreSvgRoutes();
 }
 function escapeHtml(value) { return String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
+function haversineMetres(a, b) {
+  const rad = Math.PI / 180, phi1 = a[1] * rad, phi2 = b[1] * rad;
+  const dPhi = (b[1] - a[1]) * rad, dLambda = (b[0] - a[0]) * rad;
+  const h = Math.sin(dPhi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLambda / 2) ** 2;
+  return 6371008.8 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+function buildLandsDStops(place, origin) {
+  const point = (name, longitude, latitude) => ({ attributes: { Name: name }, geometry: { spatialReference: { latestWkid: 4326 }, x: longitude, y: latitude, z: 0 } });
+  return { features: [point('Western District Elderly Community Centre', origin.longitude, origin.latitude), point(place.name, place.coordinates[0], place.coordinates[1])] };
+}
+async function landsDRoute(place, origin) {
+  const params = new URLSearchParams({ stops: JSON.stringify(buildLandsDStops(place, origin)), travelMode: '1', directionsLanguage: 'en', directionsLengthUnits: 'esriNAUMeters', outSR: '4326', f: 'json', returnZ: 'true', directionStyleName: 'NA Campus' });
+  const response = await fetch(`https://mapapi.hkmapservice.gov.hk/PedRoute/NAServer/route/solve?${params}`);
+  if (!response.ok) throw new Error(`Lands Department route service returned ${response.status}`);
+  const payload = await response.json();
+  const feature = payload.routes?.features?.[0];
+  if (!feature) return { route_exists: false, routeAnalysis: true, route_source: 'Lands Department 3D Pedestrian Network' };
+  const paths = feature.geometry?.paths || [];
+  const rawPath = paths.flat().map(c => [Number(c[0]), Number(c[1]), Number(c[2])]);
+  const path = rawPath.filter((c, i) => i === 0 || c[0] !== rawPath[i - 1][0] || c[1] !== rawPath[i - 1][1] || c[2] !== rawPath[i - 1][2]);
+  if (path.length < 2 || path.some(c => !c.every(Number.isFinite))) throw new Error('3D route elevation samples are missing');
+  const slopes = path.slice(1).map((c, i) => Math.atan2(Math.abs(c[2] - path[i][2]), Math.max(.5, haversineMetres(path[i], c))) * 180 / Math.PI);
+  const summary = payload.directions?.[0]?.summary || {};
+  const attrs = feature.attributes || {};
+  const minutes = Number(summary.totalTime ?? attrs.Total_Time);
+  const distance = Number(summary.totalLength ?? attrs.Total_Length);
+  if (!Number.isFinite(minutes) || !Number.isFinite(distance)) throw new Error('Route service returned no walking time or distance');
+  return { routeAnalysis: true, route_exists: true, accessible: true, route_source: 'Lands Department 3D Pedestrian Network', duration_s: Math.round(minutes * 60), distance_m: distance, max_slope_deg: Math.round(Math.max(...slopes) * 10) / 10, path };
+}
+let landsDTimer;
+function scheduleLandsDAnalysis() { clearTimeout(landsDTimer); landsDTimer = setTimeout(runLandsDAnalysis, 900); }
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+async function runLandsDAnalysis() {
+  if (state.google || !state.places.length) return;
+  if (state.routeQueueRunning) { state.routeQueueRequested = true; return; }
+  state.routeQueueRunning = true;
+  const originVersion = state.originVersion, origin = { ...ORIGIN };
+  try {
+    const maxSeedDistance = Math.min(2000, state.distanceMetres * 2);
+    const todo = state.places.filter(p => !p.routeAnalysis && !state.routeFailures.has(p.id) && p.study_distance_m <= maxSeedDistance);
+    for (let i = 0; i < todo.length; i += 1) {
+      if (originVersion !== state.originVersion) break;
+      const place = todo[i];
+      $('data-status').textContent = `LANDS DEPARTMENT 3D WALK NETWORK · ${i + 1}/${todo.length}`;
+      let result;
+      try { result = { place, route: await landsDRoute(place, origin) }; }
+      catch (error) { console.warn(`Route unavailable for ${place.name}.`, error); result = { place, error }; }
+      if (originVersion !== state.originVersion) break;
+      const index = state.places.findIndex(p => p.id === result.place.id);
+      if (index >= 0 && result.route) state.places[index] = { ...state.places[index], ...result.route };
+      else if (index >= 0) { state.places[index].routeError = true; state.routeFailures.add(result.place.id); }
+      render();
+      if (i + 1 < todo.length) await wait(500);
+    }
+    if (originVersion === state.originVersion) $('data-status').textContent = 'LANDS DEPARTMENT 3D ROUTES · CSDI DESTINATIONS';
+  } finally {
+    state.routeQueueRunning = false;
+    if (state.routeQueueRequested) { state.routeQueueRequested = false; scheduleLandsDAnalysis(); }
+  }
+}
 function renderMapLibreSvgRoutes() {
   const map = state.maplibre, svg = $('map-route-overlay'); if (!map || !svg) return;
   const { width, height } = map.getContainer().getBoundingClientRect();
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`); svg.setAttribute('preserveAspectRatio', 'none');
   const markup = state.places.filter(p => accessible(p) && (state.filter === 'all' || p.kind === state.filter)).map(p => {
-    const path = p.path?.length ? p.path.map(c => c.slice(0, 2)) : demoRoute(p);
+    if (!p.path?.length) return '';
+    const path = p.path.map(c => c.slice(0, 2));
     const screen = path.map(c => map.project(c));
     if (screen.some(c => !Number.isFinite(c.x) || !Number.isFinite(c.y))) return '';
     const d = screen.map((c, i) => `${i ? 'L' : 'M'} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(' ');
@@ -237,10 +278,11 @@ function addMapLibreLayers(map) {
   map.on('mouseleave', 'access-place-points', () => { map.getCanvas().style.cursor = ''; });
   map.on('click', e => {
     if (!state.pickOrigin) return;
-    ORIGIN.longitude = e.lngLat.lng; ORIGIN.latitude = e.lngLat.lat; state.pickOrigin = false; $('locate-origin').textContent = '⌖  SET ON MAP';
+    ORIGIN.longitude = e.lngLat.lng; ORIGIN.latitude = e.lngLat.lat; state.originVersion++; state.pickOrigin = false; $('locate-origin').textContent = '⌖  SET ON MAP';
     state.isochrone = null; render();
-    showToast(state.google ? 'Origin updated. Recalculating Google walking-time reach.' : 'Origin moved. Demo routes stay illustrative until the Google backend is configured.');
-    if (state.google) scheduleGoogleAnalysis();
+    state.places = state.places.map(p => ({ ...p, routeAnalysis: false, routeError: false })); state.routeFailures.clear();
+    showToast(state.google ? 'Origin updated. Recalculating walking reach.' : 'Origin moved. Recalculating Lands Department walking routes.');
+    if (state.google) scheduleGoogleAnalysis(); else scheduleLandsDAnalysis();
   });
   map.on('move', renderMapLibreSvgRoutes); map.on('resize', renderMapLibreSvgRoutes); map.on('idle', renderMapLibreSvgRoutes);
   renderMapLibreOverlays();
@@ -254,8 +296,8 @@ function initMapLibre() {
     try { addMapLibreLayers(map); }
     catch (error) { console.error('Could not add 3D building layer', error); showToast('Map loaded, but building extrusions are unavailable.'); }
     $('maplibre-container').style.display = 'block';
-    $('data-status').textContent = state.places.every(p => p.demo) || state.places.every(p => !p.demo && DEMO_PLACES.some(d => d.id === p.id)) ? 'OPENSTREETMAP 3D BUILDINGS · DEMO TARGETS' : 'OPENSTREETMAP 3D BUILDINGS · HONG KONG DATA';
-    $('map-data-label').textContent = '3D BUILDINGS · OSM STREET MAP'; $('map-attribution').textContent = '© OPENFREEMAP · © OPENSTREETMAP CONTRIBUTORS';
+    $('data-status').textContent = 'OPENSTREETMAP 3D BUILDINGS · CSDI DESTINATIONS';
+    $('map-data-label').textContent = '3D BUILDINGS · OSM STREET MAP'; $('map-attribution').textContent = 'Map from Lands Department · © OpenStreetMap contributors';
     map.once('idle', renderMapLibreOverlays);
   });
   map.on('error', e => { if (e.error) console.warn('MapLibre tile/style issue:', e.error.message); });
@@ -263,7 +305,7 @@ function initMapLibre() {
 async function initGoogle() {
   try {
     const config = await fetch(apiUrl('config')).then(r => r.json());
-    if (!config.google_enabled || !window.Cesium) { initMapLibre(); return; }
+    if (!config.google_enabled || !window.Cesium) { initMapLibre(); scheduleLandsDAnalysis(); return; }
     state.google = true;
     const viewer = new Cesium.Viewer('cesium-container', { animation: false, baseLayerPicker: false, fullscreenButton: false, geocoder: false, homeButton: false, infoBox: false, sceneModePicker: false, selectionIndicator: false, timeline: false, navigationHelpButton: false, creditContainer: document.createElement('div'), skyAtmosphere: new Cesium.SkyAtmosphere(), baseLayer: false });
     viewer.scene.globe.show = false; viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#d4ded4');
@@ -275,24 +317,24 @@ async function initGoogle() {
     state.map = viewer;
     $('cesium-container').style.display = 'block';
     $('data-status').textContent = 'GOOGLE 3D TILES · OPEN DATA LAYERS'; $('map-data-label').textContent = 'GOOGLE PHOTOREALISTIC 3D';
-    $('map-attribution').textContent = 'POWERED BY GOOGLE, ©2026 · 3D MAP DATA';
+    $('map-attribution').textContent = 'Map from Lands Department · Google Photorealistic 3D Tiles';
     renderCesiumOverlays();
     new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas).setInputAction((evt) => {
       if (!state.pickOrigin) return;
       const ray = viewer.camera.getPickRay(evt.position); const point = viewer.scene.globe.pick(ray, viewer.scene);
       if (!point) return;
-      const carto = Cesium.Cartographic.fromCartesian(point); ORIGIN.latitude = Cesium.Math.toDegrees(carto.latitude); ORIGIN.longitude = Cesium.Math.toDegrees(carto.longitude); state.pickOrigin = false; $('locate-origin').textContent = '⌖  SET ON MAP'; showToast('Origin updated. Recalculating walking routes.'); scheduleGoogleAnalysis();
+      const carto = Cesium.Cartographic.fromCartesian(point); ORIGIN.latitude = Cesium.Math.toDegrees(carto.latitude); ORIGIN.longitude = Cesium.Math.toDegrees(carto.longitude); state.originVersion++; state.pickOrigin = false; $('locate-origin').textContent = '⌖  SET ON MAP'; state.places = state.places.map(p => ({ ...p, routeAnalysis: false, routeError: false })); state.routeFailures.clear(); showToast('Origin updated. Recalculating walking routes.'); scheduleGoogleAnalysis();
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
     scheduleGoogleAnalysis();
-  } catch (error) { console.warn('Google 3D Tiles unavailable; starting the OpenStreetMap 3D view.', error); if (!state.map) initMapLibre(); }
+  } catch (error) { console.warn('Google backend unavailable; starting the open-data 3D view.', error); if (!state.map) initMapLibre(); scheduleLandsDAnalysis(); }
 }
 let requestTimer;
 function scheduleGoogleAnalysis() { clearTimeout(requestTimer); requestTimer = setTimeout(runGoogleAnalysis, 700); }
 async function runGoogleAnalysis() {
   if (!state.google) return;
-  const destinations = state.places.map(p => ({ id: p.id, name: p.name, kind: p.kind, latitude: p.coordinates?.[1] ?? { 'green-1':22.2843,'green-2':22.2824,'green-3':22.2846,'gym-1':22.2817,'gym-2':22.2850 }[p.id], longitude: p.coordinates?.[0] ?? { 'green-1':114.1280,'green-2':114.1305,'green-3':114.1247,'gym-1':114.1262,'gym-2':114.1312 }[p.id] }));
+  const destinations = state.places.map(p => ({ id: p.id, name: p.name, kind: p.kind, latitude: p.coordinates[1], longitude: p.coordinates[0] }));
   try {
-    const request = { origin: { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude }, destinations, time_minutes: state.timeMinutes, max_slope_deg: state.slope };
+    const request = { origin: { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude }, destinations, distance_m: state.distanceMetres, max_slope_deg: state.slope };
     const [response, reachResponse] = await Promise.all([
       fetch(apiUrl('analyze'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request) }),
       fetch(apiUrl('isochrone'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request) }),
@@ -300,15 +342,11 @@ async function runGoogleAnalysis() {
     if (!response.ok) throw new Error(await response.text());
     const payload = await response.json();
     const reach = reachResponse.ok ? await reachResponse.json() : null;
-    state.places = payload.results.map(result => {
-      const old = DEMO_PLACES.find(p => p.id === result.id);
-      return { ...old, ...result, googleAnalysis: true, minutes: result.duration_s / 60, coordinates: result.path?.length ? [result.path.at(-1)[0], result.path.at(-1)[1]] : old?.coordinates, xy: old?.xy || [590, 470] };
-    });
+    state.places = payload.results.map(result => ({ ...state.places.find(p => p.id === result.id), ...result, routeAnalysis: true, googleAnalysis: true, route_source: 'Google Routes + Elevation API', coordinates: result.path?.length ? [result.path.at(-1)[0], result.path.at(-1)[1]] : state.places.find(p => p.id === result.id)?.coordinates }));
     state.isochrone = reach?.feature || null;
     $('data-status').textContent = 'GOOGLE WALKING REACH · ROUTES + ELEVATION'; render();
-  } catch (error) { showToast('Route service unavailable. Showing illustrative demo routes.'); console.warn('Route analysis failed', error); }
+  } catch (error) { $('data-status').textContent = 'GOOGLE ROUTING UNAVAILABLE'; console.warn('Google route analysis failed.', error); }
 }
-function setDemo() { state.places = structuredClone(DEMO_PLACES); render(); }
 
 $('distance').addEventListener('input', setRange); $('slope').addEventListener('input', setRange);
   document.querySelectorAll('.filter').forEach(b => b.addEventListener('click', () => { state.filter = b.dataset.filter; document.querySelectorAll('.filter').forEach(item => item.classList.toggle('active', item === b)); render(); }));
