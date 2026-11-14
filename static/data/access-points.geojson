@@ -1,0 +1,11 @@
+{
+  "type": "FeatureCollection",
+  "name": "Illustrative demo access points — replace with verified GeoInfo/CSDI data",
+  "features": [
+    {"type":"Feature","id":"green-1","properties":{"name":"Cadogan Street Garden","kind":"green","source":"Illustrative demo point","demo":true},"geometry":{"type":"Point","coordinates":[114.1280,22.2843]}},
+    {"type":"Feature","id":"green-2","properties":{"name":"Smithfield Sitting-out Area","kind":"green","source":"Illustrative demo point","demo":true},"geometry":{"type":"Point","coordinates":[114.1305,22.2824]}},
+    {"type":"Feature","id":"green-3","properties":{"name":"Belcher Bay Promenade","kind":"green","source":"Illustrative demo point","demo":true},"geometry":{"type":"Point","coordinates":[114.1247,22.2846]}},
+    {"type":"Feature","id":"gym-1","properties":{"name":"Kennedy Town Outdoor Fitness Station","kind":"gym","source":"Illustrative demo point","demo":true},"geometry":{"type":"Point","coordinates":[114.1262,22.2817]}},
+    {"type":"Feature","id":"gym-2","properties":{"name":"Sai Woo Lane Fitness Corner","kind":"gym","source":"Illustrative demo point","demo":true},"geometry":{"type":"Point","coordinates":[114.1312,22.2850]}}
+  ]
+}
