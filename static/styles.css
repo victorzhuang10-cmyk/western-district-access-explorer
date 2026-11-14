@@ -42,4 +42,4 @@
 @media(max-width:760px){.view-switcher{width:300px}.section-panel{inset:60px 10px 82px;padding:12px}.section-heading{margin:0 2px 5px}.section-place-name{max-width:45%;font-size:11px}}
 @media(max-width:1050px){.map-live{font-size:9px}}
 @media(max-width:760px){.map-live{font-size:8px}.map-context small{font-size:9px}.map-attribution{display:block;max-width:calc(100% - 30px);font-size:9px}.map-zoom-hint{font-size:9px}}
-.time-chip{width:100%;max-width:100%;white-space:normal;line-height:1.35}.time-chip span:last-child{min-width:0}
+.sidebar{overflow-x:hidden}.time-chip{width:max-content;max-width:100%;white-space:normal;line-height:1.35}.time-chip span:last-child{min-width:0}

@@ -23,7 +23,7 @@ function updateSliderPaint(input) {
 function setRange() {
   state.distanceMetres = Number($('distance').value); state.walkTimeSeconds = state.distanceMetres; state.slope = Number($('slope').value); state.isochrone = null;
   $('distance-value').textContent = state.distanceMetres; $('slope-value').textContent = state.slope;
-  $('walk-time').textContent = `${(state.walkTimeSeconds / 60).toFixed(state.walkTimeSeconds % 60 ? 1 : 0)} min route-time limit · ${formatDistance(state.distanceMetres)} at 1 m/s`;
+  $('walk-time').textContent = `${(state.walkTimeSeconds / 60).toFixed(state.walkTimeSeconds % 60 ? 1 : 0)} min`;
   $('caption-distance').textContent = Math.round(state.walkTimeSeconds / 60);
   updateSliderPaint($('distance')); updateSliderPaint($('slope'));
   render();
