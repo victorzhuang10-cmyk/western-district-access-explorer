@@ -16,5 +16,28 @@
 .map-live{max-width:unset}
 .map-attribution{letter-spacing:.02em}
 .place-item{min-height:48px}
+.view-switcher{width:315px}
+.view-option{flex:1;min-width:0}
+.view-option .view-thumb{flex:none}
+.thumb-section{background:#e3e9dd;overflow:hidden}
+.thumb-section:before{content:'';position:absolute;width:29px;height:13px;left:5px;top:7px;background:#aebfa6;transform:skewY(-23deg);border:1px solid #718871}
+.thumb-section:after{content:'';position:absolute;width:25px;height:2px;left:8px;top:15px;background:#2a755f;transform:rotate(-23deg)}
+.section-panel{position:absolute;z-index:2;inset:72px 22px 85px 22px;padding:22px 24px 12px;background:#f3f2eced;border:1px solid #ffffffb0;box-shadow:0 10px 34px #1d30211c;display:flex;flex-direction:column;justify-content:center;backdrop-filter:blur(8px)}
+.section-panel[hidden]{display:none}
+.section-heading{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:0 4px 10px;color:#28342c}
+.section-heading b{font:600 11px var(--mono);letter-spacing:.1em;display:block}
+.section-heading small{font-size:11px;color:#747b72;display:block;margin-top:4px}
+.section-place-name{font-size:13px;font-weight:600;text-align:right}
+.section-panel svg{width:100%;max-height:390px;overflow:visible}
+.section-svg-label{font:600 12px 'DM Sans',sans-serif;fill:#364239}
+.section-svg-small{font:10px 'DM Mono',monospace;fill:#697468;letter-spacing:.04em}
+.section-empty{color:#667267;padding:30px;text-align:center}
+.section-mode #maplibre-container,.section-mode #cesium-container{display:none!important}
+.section-mode .map-route-overlay{display:none}
+.section-mode .map-shell{background:linear-gradient(150deg,#edf0e7,#dce4d8 66%,#cbd9d3)}
+.section-mode .map-caption{z-index:4}
+.section-mode .view-switcher{z-index:5}
+@media(max-width:1050px){.view-switcher{width:300px}}
+@media(max-width:760px){.view-switcher{width:300px}.section-panel{inset:60px 10px 82px;padding:12px}.section-heading{margin:0 2px 5px}.section-place-name{max-width:45%;font-size:11px}}
 @media(max-width:1050px){.map-live{font-size:9px}}
 @media(max-width:760px){.map-live{font-size:8px}.map-context small{font-size:9px}.map-attribution{display:block;max-width:calc(100% - 30px);font-size:9px}.map-zoom-hint{font-size:9px}}

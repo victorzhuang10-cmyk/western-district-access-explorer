@@ -1,31 +1,42 @@
 # Western District Age-Friendly Access Explorer
 
-An interactive 3D walking-accessibility prototype for exploring public green space and outdoor fitness equipment around the Western District Elderly Community Centre in Hong Kong.
+An interactive 3D walking-accessibility prototype for public green space and outdoor fitness facilities around the Western District Elderly Community Centre in Hong Kong.
 
-## Run locally
+## Open the site
+
+- Public preview: <https://victorzhuang10-cmyk.github.io/western-district-access-explorer/>
+- Public source repository: <https://github.com/victorzhuang10-cmyk/western-district-access-explorer>
+
+The preview uses an OpenStreetMap/OpenFreeMap 3D vector map with extruded building footprints, controls for a 2–30 minute walking-time threshold and a 3–20° maximum sampled slope, and selectable city, access-diagram, and route-section presentations. The sample destinations and routes are illustrative. The preview does not pretend to have Google walking results when no backend is connected.
+
+## Run the full app locally
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
+# Add GOOGLE_MAPS_API_KEY to .env, then:
 uvicorn app:app --reload
 ```
 
-Open <http://127.0.0.1:8000>. Without a Google Maps Platform key, the page renders a real OpenFreeMap/OpenStreetMap vector basemap with extruded 3D buildings in MapLibre GL JS. The bundled destination points and walking paths are illustrative until replaced with verified GeoJSON and live routing. Configure `GOOGLE_MAPS_API_KEY` in `.env` to enable Google's walking routes, elevation sampling, and Photorealistic 3D Tiles. Enable the Map Tiles API, Routes API, and Elevation API in the associated Google Cloud project, set billing, and restrict the key to this app's server IP / APIs. Do not commit `.env`.
+Open <http://127.0.0.1:8000>. The FastAPI service keeps the Google key on the server and provides Google Routes walking directions, route elevation samples, a sampled walking-time contour, and Google Photorealistic 3D Tiles. Enable the Map Tiles API, Routes API, and Elevation API in the Google Cloud project and configure billing and key restrictions. Never commit `.env`.
+
+GitHub Pages hosts only the static preview; it does not run FastAPI or provide server secrets. Google routes, elevation filtering, Google Photorealistic 3D Tiles, and server-loaded Hong Kong data are available only on a deployment with the backend and a configured key.
 
 ## Data workflow
 
-`notebooks/prepare_access_data.ipynb` shows how to read Hong Kong GeoInfo / CSDI GeoJSON layers with GeoPandas, project them to Hong Kong 1980 Grid (EPSG:2326) for metric buffers and spatial operations, and export web-ready GeoJSON. The included points are fictional and for interface demonstration only. Download current green-space and outdoor-fitness layers from the [Hong Kong GeoData Store](https://portal.csdi.gov.hk/) or [DATA.GOV.HK Outdoor Fitness Equipment](https://data.gov.hk/en-data/dataset/hk-lcsd-facility-facility-ofe/resource/75a32704-f3d7-4a53-935e-b946fc8c8078), then replace the sample file using the notebook.
+`notebooks/prepare_access_data.ipynb` uses GeoPandas to inspect CSDI / GeoInfo and DATA.GOV.HK layers, project them to Hong Kong 1980 Grid (EPSG:2326), request the app's walking-time contour, clip green-space polygons and outdoor-fitness locations to that contour, and export web-ready GeoJSON. Download source records into `data/source/`, check the schema and CRS, verify the community-centre entrance, and record source URLs, retrieval dates, and licence metadata. The checked-in `static/data/access-points.geojson` is illustrative only.
 
-## Accessibility method and limits
+Install the optional notebook tools with `pip install -r requirements-gis.txt`. The notebook expects the configured local API to provide a walking contour; it does not make Google API calls until you explicitly request and save that response.
 
-The Google integration requests pedestrian routes from the configured origin to each selected feature. It screens the returned route by distance and maximum absolute grade between sampled elevation points. The grade angle is `atan(abs(Δelevation) / horizontal segment distance)`. A route is shown only when its walking distance is within the selected radius and every sampled segment is at or below the selected grade limit. Elevation sampling is approximate; it does not identify stairs, kerbs, crossing quality, surface condition, lift outages, or step-free entrances. Treat this as an exploratory screening tool, not an accessibility certification. Use surveyed pedestrian network/elevation and field checks before making decisions.
+## How the access screening works
 
-The current implementation requests direct routes to points; it does not yet compute a full pedestrian-network isochrone or optimize alternate paths around steep segments. Google route/elevation data are subject to Google Maps Platform terms and attribution requirements. Hong Kong open-data layers retain their source metadata in the notebook.
+Google Routes computes walking travel time and route geometry. The app samples elevation along each route and estimates the steepest absolute segment angle as `atan(abs(Δelevation) / horizontal distance)`. The contour endpoint samples Google walking routes across 24 directions and checks candidate edge routes against the time and slope thresholds. This is a sampled approximation of walkable reach, not a complete pedestrian-network isochrone; it can miss alleys, route alternatives, stairs, kerbs, crossing quality, surface condition, closures, and step-free entrances. Elevation resolution may miss short ramps or steps. Field checks and a verified pedestrian network are needed before product or policy decisions.
 
-## GitHub
+The 3D section is based on Google route elevation samples when the service is configured. Its fallback profile is explicitly marked illustrative. Treat every result as exploratory, not as an accessibility certification. Google map data must retain required attribution and be used under the applicable Maps Platform terms.
 
-Project repository: <https://github.com/victorzhuang10-cmyk/western-district-access-explorer>. The local `main` branch tracks `origin/main`.
+## Sources
 
-The GitHub Pages workflow publishes the `static/` folder as a shareable interactive preview. It includes the live OpenFreeMap 3D buildings layer and illustrative sample destinations/routes. GitHub Pages does not run the FastAPI backend, so Google routing, elevation screening, Google Photorealistic 3D Tiles, and server-loaded GeoJSON require the full local/server deployment above. Set the Pages source to **GitHub Actions** in repository settings if it has not been configured already.
+- Hong Kong GeoData Store / CSDI: <https://portal.csdi.gov.hk/>
+- DATA.GOV.HK outdoor fitness equipment: <https://data.gov.hk/en-data/dataset/hk-lcsd-facility-facility-ofe/resource/75a32704-f3d7-4a53-935e-b946fc8c8078>
