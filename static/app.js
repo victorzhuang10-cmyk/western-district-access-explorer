@@ -1,7 +1,7 @@
 const ORIGIN = { latitude: 22.2833, longitude: 114.1285 };
 const $ = (id) => document.getElementById(id);
 const apiUrl = (path) => new URL(`${location.pathname.includes('/static/') ? '../' : './'}api/${path}`, document.baseURI).toString();
-const staticUrl = (path) => new URL(`${location.pathname.includes('/static/') ? './' : './static/'}${path}`, document.baseURI).toString();
+const staticUrl = (path) => new URL(`./${path}`, document.baseURI).toString();
 const state = { timeMinutes: 5, slope: 10, filter: 'all', view: 'terrain', places: [], google: false, isochrone: null, sectionPlaceId: null, map: null, maplibre: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, routeFailures: new Set() };
 
 function formatDistance(m) { return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`; }
@@ -84,7 +84,7 @@ async function loadAccessPoints() {
     $('map-data-label').textContent = 'CSDI LOCATIONS · ROUTES PENDING';
     state.sectionPlaceId = loaded[0]?.id || null;
     render();
-  } catch (error) { $('data-status').textContent = 'HONG KONG DATA UNAVAILABLE'; console.error('Could not load CSDI access locations.', error); }
+  } catch (error) { $('data-status').textContent = 'HONG KONG DATA UNAVAILABLE'; $('map-data-label').textContent = 'DESTINATION DATA NOT LOADED'; console.error('Could not load CSDI access locations.', error); }
 }
 function focusPlace(id) {
   const place = state.places.find(p => p.id === id); if (!place) return;
