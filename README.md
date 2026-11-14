@@ -26,4 +26,4 @@ The current implementation requests direct routes to points; it does not yet com
 
 ## GitHub
 
-This directory is initialized as a local Git repository. Create a new GitHub repository and push with `gh repo create` after signing in with `gh auth login`. The current GitHub CLI session in this environment is unauthenticated.
+Project repository: <https://github.com/victorzhuang10-cmyk/western-district-access-explorer> (private). The local `main` branch tracks `origin/main`.
