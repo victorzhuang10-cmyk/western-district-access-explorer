@@ -118,13 +118,13 @@ function renderCesiumOverlays() {
   const semi = Math.max(100, state.radius);
   state.routeEntities.push(state.map.entities.add({ position: Cesium.Cartesian3.fromDegrees(ORIGIN.longitude, ORIGIN.latitude), ellipse: { semiMajorAxis: semi, semiMinorAxis: semi, material: Cesium.Color.fromCssColorString('#cb5237').withAlpha(.08), outline: true, outlineColor: Cesium.Color.fromCssColorString('#cb5237').withAlpha(.8), outlineWidth: 2, height: 10 } }));
   for (const p of state.places) {
+    if (!accessible(p)) continue;
     const path = p.path?.length ? p.path : coordsForDemo(p);
     const pos = path.map(c => Cesium.Cartesian3.fromDegrees(c[0], c[1], c[2] ?? 20));
-    const accessibleNow = accessible(p);
-    const route = state.map.entities.add({ polyline: { positions: pos, width: accessibleNow ? 4 : 2, material: accessibleNow ? Cesium.Color.fromCssColorString('#276d5d') : Cesium.Color.fromCssColorString('#c6533b').withAlpha(.32), clampToGround: false } });
+    const route = state.map.entities.add({ polyline: { positions: pos, width: 4, material: Cesium.Color.fromCssColorString('#276d5d'), clampToGround: false } });
     state.routeEntities.push(route);
     const end = path[path.length - 1];
-    const marker = state.map.entities.add({ position: Cesium.Cartesian3.fromDegrees(end[0], end[1], end[2] ?? 24), point: { pixelSize: 9, color: Cesium.Color.fromCssColorString(p.kind === 'green' ? '#276d5d' : '#ca974b'), outlineColor: Cesium.Color.WHITE, outlineWidth: 2, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND }, label: { text: p.name, font: '11px DM Sans', pixelOffset: new Cesium.Cartesian2(12, -8), fillColor: Cesium.Color.fromCssColorString('#26302a'), outlineColor: Cesium.Color.WHITE, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND, show: accessibleNow } });
+    const marker = state.map.entities.add({ position: Cesium.Cartesian3.fromDegrees(end[0], end[1], end[2] ?? 24), point: { pixelSize: 9, color: Cesium.Color.fromCssColorString(p.kind === 'green' ? '#276d5d' : '#ca974b'), outlineColor: Cesium.Color.WHITE, outlineWidth: 2, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND }, label: { text: p.name, font: '11px DM Sans', pixelOffset: new Cesium.Cartesian2(12, -8), fillColor: Cesium.Color.fromCssColorString('#26302a'), outlineColor: Cesium.Color.WHITE, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND, show: true } });
     state.markerEntities.push(marker);
   }
 }
