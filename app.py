@@ -355,14 +355,15 @@ async def isochrone(request: AnalyzeRequest):
                     except (httpx.HTTPError, KeyError, ValueError):
                         continue
                 if route["duration_s"] <= request.walk_time_seconds and route["max_slope_deg"] <= request.max_slope_deg:
-                    return {"spoke": spoke, "longitude": route["path"][-1][0], "latitude": route["path"][-1][1], "duration_s": route["duration_s"], "distance_m": route["distance_m"], "max_slope_deg": route["max_slope_deg"]}
+                    endpoint = route["path"][-1]
+                    return {"spoke": spoke, "longitude": endpoint[0], "latitude": endpoint[1], "elevation_m": endpoint[2], "duration_s": route["duration_s"], "distance_m": route["distance_m"], "max_slope_deg": route["max_slope_deg"]}
             return None
 
         boundary = await asyncio.gather(*(find_spoke_edge(spoke) for spoke in range(24)))
     boundary = [point for point in boundary if point]
     if len(boundary) < 16:
         return {"feature": None, "boundary_samples": len(boundary), "requested_samples": 24, "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg, "message": "Too few slope-safe walking directions were found to draw a reliable contour."}
-    coordinates = [[point["longitude"], point["latitude"]] for point in sorted(boundary, key=lambda p: p["spoke"])]
+    coordinates = [[point["longitude"], point["latitude"], point["elevation_m"]] for point in sorted(boundary, key=lambda p: p["spoke"])]
     coordinates.append(coordinates[0])
     feature = {"type": "Feature", "properties": {"method": "Google Routes walking-time matrix with interpolated and verified boundary routes; elevation-screened spokes", "sample_count": len(boundary), "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg}, "geometry": {"type": "Polygon", "coordinates": [coordinates]}}
     return {"feature": feature, "boundary_samples": len(boundary), "requested_samples": 24, "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg}
