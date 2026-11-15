@@ -309,6 +309,7 @@ function accessiblePrefixEndpoint(path, radius, maxSlope, routeDurationSeconds, 
   return travelled >= endpointDistance * .7 ? path[path.length - 1] : null;
 }
 async function buildLandsDContour(origin, originVersion) {
+  if (state.google) return;
   const distanceMetres = state.distanceMetres, maxSlope = state.slope;
   const walkTimeSeconds = state.walkTimeSeconds;
   const cacheKey = `${originVersion}/${walkTimeSeconds}/${maxSlope}`;
@@ -335,7 +336,7 @@ async function buildLandsDContour(origin, originVersion) {
     }
   };
   await Promise.all(Array.from({ length: Math.min(4, sampleCount) }, sampleWorker));
-  if (originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope) return;
+  if (state.google || originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope) return;
   state.boundarySamples = boundary.length;
   if (boundary.length >= 12) {
     const coordinates = boundary.sort((a, b) => a.bearing - b.bearing).map(point => point.coordinate.slice());
@@ -360,23 +361,23 @@ async function runLandsDAnalysis() {
     const maxSeedDistance = Math.min(4000, state.distanceMetres * 2);
     const todo = state.places.filter(p => !p.routeAnalysis && !state.routeFailures.has(p.id) && p.study_distance_m <= maxSeedDistance);
     for (let i = 0; i < todo.length; i += 1) {
-      if (originVersion !== state.originVersion) break;
+      if (state.google || originVersion !== state.originVersion) break;
       const place = todo[i];
       $('data-status').textContent = `LANDS DEPARTMENT 3D ROUTE-TIME NETWORK · ${i + 1}/${todo.length}`;
       let result;
       try { result = { place, route: await landsDRoute(place, origin) }; }
       catch (error) { console.warn(`Route unavailable for ${place.name}.`, error); result = { place, error }; }
-      if (originVersion !== state.originVersion) break;
+      if (state.google || originVersion !== state.originVersion) break;
       const index = state.places.findIndex(p => p.id === result.place.id);
       if (index >= 0 && result.route) state.places[index] = { ...state.places[index], ...result.route };
       else if (index >= 0) { state.places[index].routeError = true; state.routeFailures.add(result.place.id); }
       render();
       if (i + 1 < todo.length) await wait(500);
     }
-    if (originVersion === state.originVersion) await buildLandsDContour(origin, originVersion);
+    if (!state.google && originVersion === state.originVersion) await buildLandsDContour(origin, originVersion);
   } finally {
     state.routeQueueRunning = false;
-    if (state.routeQueueRequested) { state.routeQueueRequested = false; scheduleLandsDAnalysis(); }
+    if (state.routeQueueRequested) { state.routeQueueRequested = false; if (!state.google) scheduleLandsDAnalysis(); }
   }
 }
 function renderMapLibreSvgRoutes() {
@@ -449,11 +450,11 @@ async function initGoogle() {
   let config = {};
   try { config = await fetch(apiUrl('config')).then(r => r.json()); }
   catch (error) { console.warn('Map backend configuration unavailable; using Hong Kong open-data basemap.', error); }
+  state.google = Boolean(config.google_enabled);
   initMapLibre();
-  scheduleLandsDAnalysis();
+  if (state.google) scheduleGoogleAnalysis(); else scheduleLandsDAnalysis();
   if (!window.Cesium || (!config.google_enabled && !config.landsd_3d_enabled)) return;
   try {
-    state.google = Boolean(config.google_enabled);
     const viewer = new Cesium.Viewer('cesium-container', { animation: false, baseLayerPicker: false, fullscreenButton: false, geocoder: false, homeButton: false, infoBox: false, sceneModePicker: false, selectionIndicator: false, timeline: false, navigationHelpButton: false, creditContainer: $('google-credits'), skyAtmosphere: new Cesium.SkyAtmosphere(), baseLayer: false });
     viewer.scene.globe.show = false; viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#d4ded4');
     viewer.scene.screenSpaceCameraController.enableCollisionDetection = false;
@@ -474,7 +475,6 @@ async function initGoogle() {
       if (!point) return;
       const carto = Cesium.Cartographic.fromCartesian(point); ORIGIN.latitude = Cesium.Math.toDegrees(carto.latitude); ORIGIN.longitude = Cesium.Math.toDegrees(carto.longitude); state.originVersion++; state.pickOrigin = false; $('locate-origin').textContent = '⌖  SET ON MAP'; state.places = state.places.map(p => ({ ...p, routeAnalysis: false, routeError: false })); state.routeFailures.clear(); showToast('Origin updated. Recalculating walking routes.'); if (state.google) scheduleGoogleAnalysis(); else scheduleLandsDAnalysis();
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-    if (state.google) scheduleGoogleAnalysis();
   } catch (error) {
     console.warn('Detailed 3D tile service unavailable; using interactive 3D building fallback.', error);
     showToast('Detailed 3D tiles are unavailable. OpenStreetMap 3D buildings remain available.');
