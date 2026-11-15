@@ -4,14 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#f4f3ee" />
-  <script>if (location.protocol === 'file:') location.replace('https://victorzhuang10-cmyk.github.io/western-district-access-explorer/map.html?v=walking-isochrone-01');</script>
+  <script>if (location.protocol === 'file:') location.replace('https://victorzhuang10-cmyk.github.io/western-district-access-explorer/map.html?v=walking-isochrone-02');</script>
   <title>Western District · Age-friendly access explorer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
   <link href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=walking-isochrone-01" />
+  <link rel="stylesheet" href="./styles.css?v=walking-isochrone-02" />
 </head>
 <body>
   <header class="topbar">
@@ -46,11 +46,11 @@
 
         <div class="slope-block">
           <div class="range-title"><div><strong>Maximum total route grade</strong><small>Start-to-end elevation change</small></div><div class="range-value slope-value"><b id="slope-value">30</b><span>°</span></div></div>
-          <input id="slope" class="range range-slope" type="range" min="3" max="50" step="1" value="30" aria-label="Maximum overall route grade in degrees" />
-          <div class="range-scale"><span>Gentler · 3°</span><span>Steeper · 50°</span></div>
+          <input id="slope" class="range range-slope" type="range" min="3" max="80" step="1" value="30" aria-label="Maximum overall route grade in degrees" />
+          <div class="range-scale"><span>Gentler · 3°</span><span>Steeper · 80°</span></div>
           <div class="range-title step-slope-title"><div><strong>Maximum next-step grade</strong><small>Between consecutive 3D samples</small></div><div class="range-value step-slope-value"><b id="step-slope-value">15</b><span>°</span></div></div>
-          <input id="step-slope" class="range range-step-slope" type="range" min="0" max="20" step="1" value="15" aria-label="Maximum grade between consecutive elevation samples" />
-          <div class="range-scale"><span>Level · 0°</span><span>Steeper · 20°</span></div>
+          <input id="step-slope" class="range range-step-slope" type="range" min="0" max="60" step="1" value="15" aria-label="Maximum grade between consecutive elevation samples" />
+          <div class="range-scale"><span>Level · 0°</span><span>Steeper · 60°</span></div>
           <div class="slope-legend"><span><i class="legend-dot accessible"></i>Within limit</span><span><i class="legend-dot steep"></i>Too steep</span></div>
         </div>
       </section>
@@ -106,6 +106,6 @@
 
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Cesium.js"></script>
   <script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.2/dist/maplibre-gl.js'"></script>
-  <script src="./app.js?v=walking-isochrone-01"></script>
+  <script src="./app.js?v=walking-isochrone-02"></script>
 </body>
 </html>

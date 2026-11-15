@@ -40,8 +40,8 @@ class AnalyzeRequest(BaseModel):
     origin: dict[str, float] | None = None
     destinations: list[Destination] = Field(default_factory=list, max_length=100)
     walk_time_seconds: int = Field(300, ge=100, le=2000)
-    max_route_slope_deg: float = Field(30, ge=3, le=50)
-    max_step_slope_deg: float = Field(15, ge=0, le=20)
+    max_route_slope_deg: float = Field(30, ge=3, le=80)
+    max_step_slope_deg: float = Field(15, ge=0, le=60)
 
 
 @app.get("/")
