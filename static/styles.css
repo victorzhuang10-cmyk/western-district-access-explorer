@@ -67,3 +67,10 @@
 .section-mode .view-switcher{width:310px}
 @media(max-width:1050px){.view-switcher{width:300px}}
 @media(max-width:760px){.view-switcher{width:min(310px,calc(100% - 24px));right:12px;bottom:12px;transform:none;padding:10px}.presentation-tabs .view-option{padding:8px 2px}.presentation-tabs .view-option b{font-size:8px}.map-caption{max-width:calc(100% - 20px)}}
+.map-loading{position:absolute;z-index:2;left:50%;top:48%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:9px;max-width:min(360px,calc(100% - 42px));padding:16px 20px;background:#f7f6eff2;border:1px solid #ffffffd9;box-shadow:0 4px 18px #26352b20;color:#465448;text-align:center;font:500 12px var(--ui);pointer-events:none}
+.map-loading[hidden]{display:none}
+.map-loading small{font:10px var(--mono);color:#81877e}
+.loading-spinner{width:18px;height:18px;border:2px solid #d9e0d6;border-top-color:#276d5d;border-radius:50%;animation:map-spin .8s linear infinite}
+.map-loading-error .loading-spinner{display:none}
+@keyframes map-spin{to{transform:rotate(360deg)}}
+@media(max-width:760px){.map-loading{font-size:11px;padding:13px 16px}}

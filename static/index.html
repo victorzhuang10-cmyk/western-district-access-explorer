@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
   <link href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=views-15" />
+  <link rel="stylesheet" href="./styles.css?v=data-seed-16" />
 </head>
 <body>
   <header class="topbar">
@@ -64,6 +64,7 @@
     <section class="map-shell" aria-label="Interactive 3D accessibility map">
       <div id="cesium-container" class="map-canvas"></div>
       <div id="maplibre-container" class="map-canvas" aria-label="Interactive 3D map with OpenStreetMap buildings"></div>
+      <div id="map-loading" class="map-loading" role="status" aria-live="polite"><span class="loading-spinner" aria-hidden="true"></span><span>Loading Hong Kong streets and 3D buildings…</span><small>Map tiles usually appear after a few seconds</small></div>
       <svg id="map-route-overlay" class="map-route-overlay" aria-hidden="true"></svg>
       <div class="map-topline"><div class="map-context"><span class="context-mark">⌖</span><span><b>SAI YING PUN</b><small>WESTERN DISTRICT, HONG KONG</small></span></div><div class="map-live"><i></i> <span id="map-data-label">3D DETAILED MASSING · ACCESS ROUTES</span></div></div>
       <div class="map-controls"><button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button><button id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button><span></span><button id="reset-view" title="Reset view" aria-label="Reset view">⌖</button></div>
@@ -94,6 +95,6 @@
 
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Cesium.js"></script>
   <script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.2/dist/maplibre-gl.js'"></script>
-  <script src="./app.js?v=views-15"></script>
+  <script src="./app.js?v=data-seed-16"></script>
 </body>
 </html>

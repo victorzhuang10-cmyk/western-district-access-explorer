@@ -334,7 +334,7 @@ async function runLandsDAnalysis() {
   state.routeQueueRunning = true;
   const originVersion = state.originVersion, origin = { ...ORIGIN };
   try {
-    const maxSeedDistance = Math.min(2000, state.distanceMetres * 2);
+    const maxSeedDistance = Math.min(4000, state.distanceMetres * 2);
     const todo = state.places.filter(p => !p.routeAnalysis && !state.routeFailures.has(p.id) && p.study_distance_m <= maxSeedDistance);
     for (let i = 0; i < todo.length; i += 1) {
       if (originVersion !== state.originVersion) break;
@@ -404,18 +404,19 @@ function addMapLibreLayers(map) {
   renderMapLibreOverlays();
 }
 function initMapLibre() {
-  if (!window.maplibregl) { showToast('The 3D map library did not load. Check the connection and refresh.'); return; }
+  if (!window.maplibregl) { $('map-loading').textContent = 'Map library unavailable · check your connection and reload'; $('map-loading').classList.add('map-loading-error'); showToast('The map library did not load. Check the connection and refresh.'); return; }
   const map = new maplibregl.Map({ container: 'maplibre-container', style: 'https://tiles.openfreemap.org/styles/liberty', center: [MAP_CENTER.longitude, MAP_CENTER.latitude], zoom: 15.6, pitch: 0, bearing: 0, maxPitch: 65, attributionControl: true, antialias: true, cooperativeGestures: true });
   state.maplibre = map;
+  const mapLoadTimer = setTimeout(() => { if (!$('map-loading').hidden) $('map-loading').textContent = 'Map tiles are taking longer than usual · keep this page open while they load'; }, 12000);
   map.addControl(new maplibregl.NavigationControl({ showCompass: false, showZoom: false }), 'top-right');
   map.on('load', () => {
     try { addMapLibreLayers(map); }
     catch (error) { console.error('Could not add 3D building layer', error); showToast('Map loaded, but building extrusions are unavailable.'); }
     $('data-status').textContent = 'OPENSTREETMAP 3D BUILDINGS · CSDI DESTINATIONS';
     $('map-data-label').textContent = '3D BUILDINGS · OSM STREET MAP'; $('map-attribution').textContent = '© OpenStreetMap contributors · OpenFreeMap · routes/data © Lands Department';
-    map.once('idle', () => { applyPresentation(); renderMapLibreOverlays(); });
+    map.once('idle', () => { clearTimeout(mapLoadTimer); $('map-loading').hidden = true; applyPresentation(); renderMapLibreOverlays(); });
   });
-  map.on('error', e => { if (e.error) console.warn('MapLibre tile/style issue:', e.error.message); });
+  map.on('error', e => { if (e.error) console.warn('MapLibre tile/style issue:', e.error.message); if (!map.isStyleLoaded()) { $('map-loading').textContent = 'Connecting to Hong Kong street and 3D building data…'; $('map-loading').classList.remove('map-loading-error'); } });
 }
 async function initGoogle() {
   let config = {};
