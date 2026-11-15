@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 12036)
-Total output lines: 534
-
 const ORIGIN = { latitude: 22.2855625, longitude: 114.1347709 };
 const MAP_CENTER = { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude };
 const $ = (id) => document.getElementById(id);
@@ -263,7 +260,11 @@ function escapeHtml(value) { return String(value).replace(/[&<>"']/g, c => ({ '&
 function haversineMetres(a, b) {
   const rad = Math.PI / 180, phi1 = a[1] * rad, phi2 = b[1] * rad;
   const dPhi = (b[1] - a[1]) * rad, dLambda = (b[0] - a[0]) * rad;
-  const h = Math.sin(dPhi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.…36 tokens truncated…st point = (name, longitude, latitude) => ({ attributes: { Name: name }, geometry: { spatialReference: { latestWkid: 4326 }, x: longitude, y: latitude, z: 0 } });
+  const h = Math.sin(dPhi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLambda / 2) ** 2;
+  return 6371008.8 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+function buildLandsDStops(place, origin) {
+  const point = (name, longitude, latitude) => ({ attributes: { Name: name }, geometry: { spatialReference: { latestWkid: 4326 }, x: longitude, y: latitude, z: 0 } });
   return { features: [point('Western District Elderly Community Centre', origin.longitude, origin.latitude), point(place.name, place.coordinates[0], place.coordinates[1])] };
 }
 async function landsDRoute(place, origin) {
