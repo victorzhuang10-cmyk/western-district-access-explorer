@@ -3,7 +3,7 @@ const MAP_CENTER = { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude };
 const $ = (id) => document.getElementById(id);
 const apiUrl = (path) => new URL(`${location.pathname.includes('/static/') ? '../' : './'}api/${path}`, document.baseURI).toString();
 const staticUrl = (path) => new URL(`./${path}`, document.baseURI).toString();
-const state = { distanceMetres: 300, walkTimeSeconds: 300, slope: 15, filter: 'all', view: 'reach', mapStyle: 'detailed', massingStyle: 'detailed', reachStyle: 'detailed', places: [], google: false, isochrone: null, boundarySamples: 0, sectionPlaceId: null, map: null, maplibre: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, googleAnalysisVersion: 0, googleController: null, routeFailures: new Set(), boundaryCache: new Map() };
+const state = { distanceMetres: 300, walkTimeSeconds: 300, slope: 15, filter: 'all', view: 'reach', mapStyle: 'detailed', massingStyle: 'detailed', reachStyle: 'detailed', places: [], google: false, isochrone: null, boundarySamples: 0, sectionPlaceId: null, map: null, maplibre: null, tileset: null, clippingSignature: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, googleAnalysisVersion: 0, googleController: null, routeFailures: new Set(), boundaryCache: new Map() };
 
 function formatDistance(m) { return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`; }
 function durationMinutes(p) { return p.duration_s != null ? p.duration_s / 60 : null; }
@@ -136,7 +136,7 @@ function setView(mode) {
 }
 function applyPresentation() {
   const style = currentStyle(), view = state.view, threeD = view !== 'map';
-  const useCesium = threeD && Boolean(state.map);
+  const useCesium = threeD && style === 'detailed' && Boolean(state.map);
   $('cesium-container').style.display = useCesium ? 'block' : 'none';
   $('maplibre-container').style.display = useCesium || !state.maplibre ? 'none' : 'block';
   const shell = document.querySelector('.map-shell');
@@ -149,10 +149,10 @@ function applyPresentation() {
       if (layer.id === '3d-buildings') {
         map.setLayoutProperty(layer.id, 'visibility', threeD ? 'visible' : 'none');
         map.setPaintProperty(layer.id, 'fill-extrusion-color', style === 'diagram' ? '#f7f7f1' : '#b7c1b3');
-        map.setPaintProperty(layer.id, 'fill-extrusion-opacity', style === 'diagram' ? .96 : .72);
+        map.setPaintProperty(layer.id, 'fill-extrusion-opacity', style === 'diagram' ? .98 : .72);
       } else if (layer.id === 'reach-mask-fill') {
         map.setLayoutProperty(layer.id, 'visibility', view === 'reach' ? 'visible' : 'none');
-        map.setPaintProperty(layer.id, 'fill-opacity', style === 'diagram' ? .76 : .58);
+        map.setPaintProperty(layer.id, 'fill-opacity', style === 'diagram' ? .96 : .82);
       } else if (layer.id.startsWith('walk-buffer-')) {
         map.setLayoutProperty(layer.id, 'visibility', view === 'reach' || view === 'map' ? 'visible' : 'none');
       } else if (!['accessible-route-casing','accessible-routes','access-place-points','access-place-labels','origin-point','origin-label'].includes(layer.id)) {
@@ -163,19 +163,62 @@ function applyPresentation() {
         if (layer.type === 'line' && layer.paint?.['line-color']) map.setPaintProperty(layer.id, 'line-color', style === 'diagram' ? '#c5c9bf' : '#aeb5ac');
       }
     }
-    map.flyTo({ center: [ORIGIN.longitude, ORIGIN.latitude], zoom: view === 'reach' ? 17.1 : threeD ? 16.7 : 15.6, pitch: threeD ? 48 : 0, bearing: threeD && style === 'detailed' ? -12 : 0, duration: 550 });
-    requestAnimationFrame(() => map.resize());
+    if (!(view === 'reach' && state.isochrone?.geometry?.type === 'Polygon')) map.flyTo({ center: [ORIGIN.longitude, ORIGIN.latitude], zoom: threeD ? 16.7 : 15.6, pitch: threeD ? 48 : 0, bearing: threeD && style === 'detailed' ? -12 : 0, duration: 550 });
+    requestAnimationFrame(() => { map.resize(); if (view === 'reach' && state.isochrone?.geometry?.type === 'Polygon') fitReachView(); });
   }
   if (state.map) {
     state.map.scene.screenSpaceCameraController.enableTilt = threeD;
-    state.map.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(ORIGIN.longitude, ORIGIN.latitude, threeD ? 1100 : 1750), orientation: { heading: 0, pitch: Cesium.Math.toRadians(threeD ? -50 : -72), roll: 0 }, duration: .6 });
+    syncCesiumReachClip();
+    if (view === 'reach' && state.isochrone?.geometry?.type === 'Polygon') fitReachView();
+    else state.map.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(ORIGIN.longitude, ORIGIN.latitude, threeD ? Math.max(700, state.distanceMetres * 3.2) : 1750), orientation: { heading: 0, pitch: Cesium.Math.toRadians(threeD ? -50 : -72), roll: 0 }, duration: .6 });
   }
   $('map-data-label').textContent = view === 'map' ? `2D ${style.toUpperCase()} MAP · ROUTE-TIME REACH` : view === 'massing' ? `3D ${style.toUpperCase()} MASSING · ACCESS ROUTES` : `3D ${style.toUpperCase()} REACH · BUFFER + ROUTES`;
   renderMapLibreOverlays(); renderCesiumOverlays();
 }
 
+function syncCesiumReachClip() {
+  if (!state.tileset) return;
+  const ring = state.view === 'reach' && state.reachStyle === 'detailed' ? state.isochrone?.geometry?.coordinates?.[0] : null;
+  if (!ring || ring.length < 4) {
+    if (state.clippingSignature !== null) state.tileset.clippingPolygons = undefined;
+    state.clippingSignature = null;
+    return;
+  }
+  const signature = JSON.stringify(ring);
+  if (signature === state.clippingSignature) return;
+  if (!Cesium.ClippingPolygonCollection.isSupported(state.map.scene)) {
+    state.tileset.clippingPolygons = undefined;
+    state.clippingSignature = 'unsupported';
+    showToast('This browser cannot clip 3D tiles; the reach outline remains visible.');
+    return;
+  }
+  const openRing = ring.slice(0, -1);
+  const positions = openRing.map(point => Cesium.Cartesian3.fromDegrees(point[0], point[1], 0));
+  const polygon = new Cesium.ClippingPolygon({ positions });
+  state.tileset.clippingPolygons = new Cesium.ClippingPolygonCollection({ polygons: [polygon], inverse: true });
+  state.clippingSignature = signature;
+}
+
+function fitReachView() {
+  const ring = state.isochrone?.geometry?.type === 'Polygon' ? state.isochrone.geometry.coordinates[0] : null;
+  if (!ring?.length) return;
+  const openRing = ring.slice(0, -1);
+  if (state.map && state.view === 'reach' && state.reachStyle === 'detailed') {
+    const points = openRing.map(point => Cesium.Cartesian3.fromDegrees(point[0], point[1], Number(point[2]) || 0));
+    const sphere = Cesium.BoundingSphere.fromPoints(points);
+    const range = Math.max(450, sphere.radius * 2.8);
+    state.map.camera.flyToBoundingSphere(sphere, { duration: .7, offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(-12), Cesium.Math.toRadians(-48), range) });
+  }
+  if (state.maplibre && state.view === 'reach' && (!state.map || state.reachStyle === 'diagram')) {
+    const bounds = new maplibregl.LngLatBounds();
+    openRing.forEach(point => bounds.extend([point[0], point[1]]));
+    state.maplibre.fitBounds(bounds, { padding: { top: 105, right: 85, bottom: 150, left: 85 }, maxZoom: 18.3, duration: 700, pitch: 48, bearing: 0 });
+  }
+}
+
 function renderCesiumOverlays() {
   if (!state.map) return;
+  syncCesiumReachClip();
   for (const entity of [...state.routeEntities, ...state.markerEntities]) state.map.entities.remove(entity);
   state.routeEntities = []; state.markerEntities = [];
   const originRoute = state.places.find(p => p.path?.length && Number.isFinite(Number(p.path[0][2])))?.path;
@@ -236,6 +279,9 @@ function renderSectionMap() {
 }
 function renderMapLibreOverlays() {
   const map = state.maplibre; if (!map || !map.getSource('access-routes')) return;
+  const buildingBaseFilter = ['!=', ['get', 'hide_3d'], true];
+  const reachGeometry = state.view === 'reach' ? state.isochrone?.geometry : null;
+  map.setFilter('3d-buildings', reachGeometry?.type === 'Polygon' ? ['all', buildingBaseFilter, ['within', reachGeometry]] : buildingBaseFilter);
   const inReach = state.places.filter(p => accessible(p) && (state.filter === 'all' || p.kind === state.filter));
   const routes = inReach.filter(p => p.path?.length).map(p => ({ type: 'Feature', properties: { id: p.id, name: p.name, kind: p.kind }, geometry: { type: 'LineString', coordinates: p.path.map(c => c.slice(0, 2)) } }));
   const places = inReach.filter(p => p.coordinates).map(p => {
@@ -313,7 +359,7 @@ async function buildLandsDContour(origin, originVersion) {
   const distanceMetres = state.distanceMetres, maxSlope = state.slope;
   const walkTimeSeconds = state.walkTimeSeconds;
   const cacheKey = `${originVersion}/${walkTimeSeconds}/${maxSlope}`;
-  if (state.boundaryCache.has(cacheKey)) { state.isochrone = state.boundaryCache.get(cacheKey); render(); return; }
+  if (state.boundaryCache.has(cacheKey)) { state.isochrone = state.boundaryCache.get(cacheKey); render(); fitReachView(); return; }
   const boundary = [], sampleCount = 24, bearingStep = 360 / sampleCount;
   let nextSpoke = 0, completedSpokes = 0;
   const sampleWorker = async () => {
@@ -347,7 +393,7 @@ async function buildLandsDContour(origin, originVersion) {
   $('data-status').textContent = state.isochrone
     ? `LANDS DEPARTMENT 3D ROUTES · ${boundary.length}/${sampleCount} SLOPE-SAFE DIRECTIONS`
     : `LANDS DEPARTMENT 3D ROUTES · BUFFER WITHHELD (${boundary.length}/${sampleCount} SLOPE-SAFE DIRECTIONS)`;
-  render();
+  render(); fitReachView();
 }
 let landsDTimer;
 function scheduleLandsDAnalysis() { clearTimeout(landsDTimer); landsDTimer = setTimeout(runLandsDAnalysis, 900); }
@@ -460,7 +506,7 @@ async function initGoogle() {
     viewer.scene.screenSpaceCameraController.enableCollisionDetection = false;
     const endpoint = config.google_enabled ? apiUrl('google-3d-tiles/v1/3dtiles/root.json') : apiUrl('landsd-3d-tiles/f2/tileset.json');
     const tiles = await Cesium.Cesium3DTileset.fromUrl(endpoint, { showCreditsOnScreen: true });
-    viewer.scene.primitives.add(tiles);
+    viewer.scene.primitives.add(tiles); state.tileset = tiles;
     viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(ORIGIN.longitude, ORIGIN.latitude, 1450), orientation: { heading: Cesium.Math.toRadians(12), pitch: Cesium.Math.toRadians(-48), roll: 0 } });
     viewer.scene.globe.depthTestAgainstTerrain = true;
     state.map = viewer;
@@ -511,7 +557,7 @@ async function runGoogleAnalysis(version) {
       return { ...place, ...result, routeAnalysis: true, googleAnalysis: true, route_source: 'Google Routes + Elevation API', coordinates: result.path?.length ? [result.path.at(-1)[0], result.path.at(-1)[1]] : place.coordinates };
     });
     state.isochrone = reach?.feature || null;
-    $('data-status').textContent = 'GOOGLE WALKING REACH · ROUTES + ELEVATION'; render();
+    $('data-status').textContent = 'GOOGLE WALKING REACH · ROUTES + ELEVATION'; render(); syncCesiumReachClip(); fitReachView();
   } catch (error) {
     if (version !== state.googleAnalysisVersion || error.name === 'AbortError') return;
     $('data-status').textContent = 'GOOGLE ROUTING UNAVAILABLE'; console.warn('Google route analysis failed.', error);
