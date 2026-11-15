@@ -298,32 +298,32 @@ async function buildLandsDContour(origin, originVersion) {
   const walkTimeSeconds = state.walkTimeSeconds;
   const cacheKey = `${originVersion}/${walkTimeSeconds}/${maxSlope}`;
   if (state.boundaryCache.has(cacheKey)) { state.isochrone = state.boundaryCache.get(cacheKey); render(); return; }
-  const boundary = [];
-  for (let spoke = 0; spoke < 12; spoke++) {
+  const boundary = [], sampleCount = 24, bearingStep = 360 / sampleCount;
+  for (let spoke = 0; spoke < sampleCount; spoke++) {
     if (originVersion !== state.originVersion) return;
-    $('data-status').textContent = `SAMPLING ROUTE-TIME REACH · ${spoke + 1}/12`;
-    const coordinates = radialDestination(origin, Math.min(4000, distanceMetres * 1.6), spoke * 30);
+    $('data-status').textContent = `SAMPLING ROUTE-TIME REACH · ${spoke + 1}/${sampleCount}`;
+    const coordinates = radialDestination(origin, Math.min(4000, distanceMetres * 1.6), spoke * bearingStep);
     const target = { id: `buffer-${spoke}`, name: 'Walking-time boundary sample', coordinates };
     try {
       const route = await landsDRoute(target, origin);
       if (route.route_exists && route.path?.length) {
         const endpoint = accessiblePrefixEndpoint(route.path, distanceMetres * 1.6, maxSlope, route.duration_s, walkTimeSeconds);
-        if (endpoint) boundary.push({ bearing: spoke * 30, coordinate: endpoint });
+        if (endpoint) boundary.push({ bearing: spoke * bearingStep, coordinate: endpoint });
       }
     } catch (error) { console.warn(`Walking-time boundary sample ${spoke + 1} unavailable.`, error); }
-    if (spoke < 11) await wait(500);
+    if (spoke + 1 < sampleCount) await wait(250);
   }
   if (originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope) return;
   state.boundarySamples = boundary.length;
-  if (boundary.length >= 6) {
+  if (boundary.length >= 12) {
     const coordinates = boundary.sort((a, b) => a.bearing - b.bearing).map(point => point.coordinate.slice(0, 2));
     coordinates.push(coordinates[0]);
-    state.isochrone = { type: 'Feature', properties: { method: '12 sampled Lands Department 3D routes clipped at returned travel-time and grade limits; travel time is apportioned by route length', sample_count: boundary.length, walk_time_seconds: walkTimeSeconds, equivalent_distance_m: distanceMetres, max_slope_deg: maxSlope }, geometry: { type: 'Polygon', coordinates: [coordinates] } };
+    state.isochrone = { type: 'Feature', properties: { method: '24 sampled Lands Department 3D routes clipped at returned travel-time and grade limits; travel time is apportioned by route length', sample_count: boundary.length, walk_time_seconds: walkTimeSeconds, equivalent_distance_m: distanceMetres, max_slope_deg: maxSlope }, geometry: { type: 'Polygon', coordinates: [coordinates] } };
   } else state.isochrone = null;
   state.boundaryCache.set(cacheKey, state.isochrone);
   $('data-status').textContent = state.isochrone
-    ? `LANDS DEPARTMENT 3D ROUTES · ${boundary.length}/12 BUFFER SAMPLES`
-    : `LANDS DEPARTMENT 3D ROUTES · BUFFER WITHHELD (${boundary.length}/12 SLOPE-SAFE SAMPLES)`;
+    ? `LANDS DEPARTMENT 3D ROUTES · ${boundary.length}/${sampleCount} BUFFER SAMPLES`
+    : `LANDS DEPARTMENT 3D ROUTES · BUFFER WITHHELD (${boundary.length}/${sampleCount} SLOPE-SAFE SAMPLES)`;
   render();
 }
 let landsDTimer;
