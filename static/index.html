@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
   <link href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=reach-cut-18" />
+  <link rel="stylesheet" href="./styles.css?v=reach-cut-19" />
 </head>
 <body>
   <header class="topbar">
@@ -46,7 +46,7 @@
 
         <div class="slope-block">
           <div class="range-title"><div><strong>Maximum route slope</strong><small>Steepest sampled segment</small></div><div class="range-value slope-value"><b id="slope-value">10</b><span>°</span></div></div>
-          <input id="slope" class="range range-slope" type="range" min="3" max="20" step="1" value="10" aria-label="Maximum allowed slope in degrees" />
+          <input id="slope" class="range range-slope" type="range" min="3" max="20" step="1" value="15" aria-label="Maximum allowed slope in degrees" />
           <div class="range-scale"><span>Gentler · 3°</span><span>Steeper · 20°</span></div>
           <div class="slope-legend"><span><i class="legend-dot accessible"></i>Within limit</span><span><i class="legend-dot steep"></i>Too steep</span></div>
         </div>
@@ -95,6 +95,6 @@
 
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Cesium.js"></script>
   <script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.2/dist/maplibre-gl.js'"></script>
-  <script src="./app.js?v=reach-cut-18"></script>
+  <script src="./app.js?v=reach-cut-19"></script>
 </body>
 </html>
