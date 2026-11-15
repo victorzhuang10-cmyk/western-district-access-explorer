@@ -278,6 +278,30 @@ def walking_candidates(origin: dict[str, float], distance_m: int, spokes: int = 
     return points
 
 
+def sampled_reach_geometry(boundary: list[dict], origin: dict[str, float], spokes: int = 24) -> dict | None:
+    """Draw only adjacent verified directions; leave failed bearings as gaps."""
+    by_spoke = {int(point["spoke"]): point for point in boundary}
+    valid = set(by_spoke)
+    if len(valid) == spokes:
+        ring = [[by_spoke[i]["longitude"], by_spoke[i]["latitude"], by_spoke[i]["elevation_m"]] for i in range(spokes)]
+        ring.append(ring[0])
+        return {"type": "Polygon", "coordinates": [ring]}
+
+    origin_height = float(boundary[0].get("origin_elevation_m", 0))
+    origin_point = [origin["longitude"], origin["latitude"], origin_height]
+    starts = [i for i in valid if (i - 1) % spokes not in valid]
+    sectors = []
+    for start in starts:
+        run = [start]
+        while (run[-1] + 1) % spokes in valid and (run[-1] + 1) % spokes != start:
+            run.append((run[-1] + 1) % spokes)
+        if len(run) < 2:
+            continue
+        ring = [origin_point] + [[by_spoke[i]["longitude"], by_spoke[i]["latitude"], by_spoke[i]["elevation_m"]] for i in run] + [origin_point]
+        sectors.append([ring])
+    return {"type": "MultiPolygon", "coordinates": sectors} if sectors else None
+
+
 def seconds(value: str | None) -> int:
     try:
         return int(float(str(value or "0s").removesuffix("s")))
@@ -356,16 +380,17 @@ async def isochrone(request: AnalyzeRequest):
                         continue
                 if route["duration_s"] <= request.walk_time_seconds and route["max_slope_deg"] <= request.max_slope_deg:
                     endpoint = route["path"][-1]
-                    return {"spoke": spoke, "longitude": endpoint[0], "latitude": endpoint[1], "elevation_m": endpoint[2], "duration_s": route["duration_s"], "distance_m": route["distance_m"], "max_slope_deg": route["max_slope_deg"]}
+                    return {"spoke": spoke, "longitude": endpoint[0], "latitude": endpoint[1], "elevation_m": endpoint[2], "origin_elevation_m": route["path"][0][2], "duration_s": route["duration_s"], "distance_m": route["distance_m"], "max_slope_deg": route["max_slope_deg"]}
             return None
 
         boundary = await asyncio.gather(*(find_spoke_edge(spoke) for spoke in range(24)))
     boundary = [point for point in boundary if point]
     if len(boundary) < 16:
         return {"feature": None, "boundary_samples": len(boundary), "requested_samples": 24, "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg, "message": "Too few slope-safe walking directions were found to draw a reliable contour."}
-    coordinates = [[point["longitude"], point["latitude"], point["elevation_m"]] for point in sorted(boundary, key=lambda p: p["spoke"])]
-    coordinates.append(coordinates[0])
-    feature = {"type": "Feature", "properties": {"method": "Google Routes walking-time matrix with interpolated and verified boundary routes; elevation-screened spokes", "sample_count": len(boundary), "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg}, "geometry": {"type": "Polygon", "coordinates": [coordinates]}}
+    geometry = sampled_reach_geometry(boundary, origin)
+    if geometry is None:
+        return {"feature": None, "boundary_samples": len(boundary), "requested_samples": 24, "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg, "message": "No adjacent pair of slope-safe directions was found; no filled reach area is shown."}
+    feature = {"type": "Feature", "properties": {"method": "24 Google Routes walking-time directions with interpolated and verified edge routes; elevation-screened sectors are drawn only between adjacent valid directions, leaving failed directions open", "sample_count": len(boundary), "requested_samples": 24, "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg}, "geometry": geometry}
     return {"feature": feature, "boundary_samples": len(boundary), "requested_samples": 24, "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg}
 
 
