@@ -86,7 +86,7 @@ async function loadAccessPoints() {
     state.places = loaded; render();
     $('data-status').textContent = `CSDI HONG KONG DATA · ${loaded.length} LOCATIONS`;
     $('map-data-label').textContent = 'CSDI LOCATIONS · ROUTES PENDING';
-    state.sectionPlaceId = loaded[0]?.id || null;
+    state.sectionPlaceId = null;
     render();
   } catch (error) { $('data-status').textContent = 'HONG KONG DATA UNAVAILABLE'; $('map-data-label').textContent = 'DESTINATION DATA NOT LOADED'; console.error('Could not load CSDI access locations.', error); }
 }
@@ -195,7 +195,8 @@ function renderCesiumOverlays() {
 function mapLibreLayersReady() { return state.maplibre && state.maplibre.isStyleLoaded() && state.maplibre.getSource('access-routes'); }
 function renderSectionMap() {
   const host = $('section-panel'); if (!host) return;
-  const place = state.places.find(p => p.id === state.sectionPlaceId) || state.places.find(accessible) || state.places[0];
+  const selected = state.places.find(p => p.id === state.sectionPlaceId);
+  const place = selected || state.places.find(p => accessible(p) && p.path?.length) || state.places.find(p => p.routeAnalysis && p.path?.length) || state.places[0];
   if (!place) { host.innerHTML = '<div class="section-empty">CSDI destination locations are loading.</div>'; return; }
   if (!place.routeAnalysis || !place.path?.length) { host.innerHTML = `<div class="section-empty">${escapeHtml(place.name)}<br/><small>Request a route to see the 3D elevation profile. The profile uses Lands Department 3D pedestrian-network heights.</small></div>`; return; }
   const path = place.path;
