@@ -4,10 +4,10 @@ An interactive 3D walking-accessibility prototype for public green space and out
 
 ## Open the site
 
-- Public preview: <https://victorzhuang10-cmyk.github.io/western-district-access-explorer/map-preview-nearby-seed-02.html?v=tablet-split-01>
+- Public preview: <https://victorzhuang10-cmyk.github.io/western-district-access-explorer/map-preview-nearby-seed-02.html?v=reach-context-02>
 - Public source repository: <https://github.com/victorzhuang10-cmyk/western-district-access-explorer>
 
-The preview opens at Hill Court, 28 Hill Road, Sai Ying Pun, using the Western District Elderly Community Centre listing in Google Maps and the operator address. Its six presentation states combine a detailed or diagram 2D street map, 3D building massing, and a 3D walking-reach cutaway. The 3D reach view masks the surrounding city and highlights the walking-time contour, origin, routes, and reachable green-space / outdoor-fitness locations. A route elevation profile is also available. The Pages preview uses OpenStreetMap/OpenFreeMap buildings and Hong Kong CSDI destination points, with Lands Department 3D Pedestrian Route times, paths, and elevation samples. When configured, the server can load Google Photorealistic 3D Tiles or the official Lands Department 3D Visualisation tiles. The 100 m–2 km slider is an equivalent walk-time budget at a 1 m/s reference pace (300 m = 5 minutes); route accessibility is screened by actual returned travel time and the 3–20° slope control. The no-key contour samples 24 real 3D routes and apportions each total route time by path length to estimate the boundary; it is a planning approximation, not a complete isochrone. Open-space source records are points, not park parcel boundaries.
+The preview opens at Hill Court, 28 Hill Road, Sai Ying Pun, using the Western District Elderly Community Centre listing in Google Maps and the operator address. Its six presentation states combine a detailed or diagram 2D street map, 3D building massing, and a 3D walking-reach view. The reach view keeps surrounding buildings visible for context while highlighting the sampled reach, origin, routes, and nearby green-space / outdoor-fitness locations. A route elevation profile is also available. The Pages preview uses OpenStreetMap/OpenFreeMap buildings and Hong Kong CSDI destination points, with Lands Department 3D Pedestrian Route times, paths, and elevation samples. When configured, the server can load Google Photorealistic 3D Tiles or the official Lands Department 3D Visualisation tiles. The 100 m–2 km slider is an equivalent walk-time budget at a 1 m/s reference pace (300 m = 5 minutes); route accessibility is screened by actual returned travel time and the 3–20° slope control. The no-key contour samples 24 real 3D routes and apportions each total route time by path length to estimate the boundary. Only adjacent successful directions are filled; failed or too-steep directions remain open instead of being bridged. Both contours remain planning approximations, not complete pedestrian-network isochrones. Open-space source records are points, not park parcel boundaries.
 
 If you open a checked-out HTML file directly from Finder, it redirects to the public preview. The map needs a web server because browsers restrict its public data requests from `file://` pages.
 
@@ -26,6 +26,19 @@ Open <http://127.0.0.1:8000>. The FastAPI service keeps the Google key on the se
 
 GitHub Pages hosts only the static preview; it does not run FastAPI or provide server secrets. Google Photorealistic 3D Tiles and Google Routes are available only on a deployment with the backend and a configured key. The Pages preview calls the official Lands Department pedestrian-route service directly for its 3D route and elevation data. To use the official tiled 3D Visualisation Map, request a free API key from Lands Department at 3dmap@landsd.gov.hk and set `LANDSD_3D_MAP_API_KEY` in the Render service environment; the backend keeps that key out of browser code and proxies tile requests. Without this key, the 3D building massing view remains available.
 
+## Google Maps Platform cost
+
+Google Maps Platform is pay-as-you-go. You can stay within the monthly free usage caps at low usage, but Google requires billing to be enabled for these APIs. Current global USD pricing lists these per-SKU monthly free caps and first paid tier:
+
+| API / SKU used by the Google-backed map | Free monthly billable events | First paid tier |
+| --- | ---: | ---: |
+| Photorealistic 3D Tiles | 1,000 returned 3D tile requests | $6 per 1,000 |
+| Compute Routes Essentials | 10,000 successful requests | $5 per 1,000 |
+| Compute Route Matrix Essentials | 10,000 returned matrix elements | $5 per 1,000 |
+| Elevation | 5,000 successful requests | $5 per 1,000 |
+
+These are separate SKU allowances; tile usage is counted per returned tile, not per map view, so the number of tiles and eventual charge depends on how visitors pan, zoom, and load the 3D scene. At the default 300 m reach setting, the current contour calculation can use about 120 matrix elements plus up to 24 route and 24 elevation calls for the contour, with additional route/elevation calls for destination labels. Retries and the number of nearby places change the total. Set daily API quotas in Google Cloud and check the live [Google Maps Platform price list](https://developers.google.com/maps/billing-and-pricing/pricing) and [Routes billing rules](https://developers.google.com/maps/documentation/routes/usage-and-billing) before opening the key to public traffic. These are current global rates; account region and applicable SKU features can change billing.
+
 ## Deploy the Google-enabled app
 
 The repository includes `render.yaml` for a same-origin FastAPI deployment. Use this button to create the free Render service from the public repository:
@@ -42,7 +55,7 @@ Install the optional notebook tools with `pip install -r requirements-gis.txt`. 
 
 ## How the access screening works
 
-The route services provide 3D geometry, walking distance, and travel time. The app estimates the steepest absolute elevation-sample angle as `atan(abs(Δelevation) / horizontal distance)`. The Google contour endpoint samples Google walking durations at five candidate distances along each of 24 directions, interpolates between the closest inside/outside travel-time candidates, then verifies the estimated edge with route geometry and elevation samples. The resulting slope-screened contour is still a sampled approximation, not a complete pedestrian-network isochrone; it can miss alleys, route alternatives, stairs, kerbs, crossing quality, surface condition, closures, and step-free entrances. Elevation resolution may miss short ramps or steps. Field checks and a verified pedestrian network are needed before product or policy decisions.
+The route services provide 3D geometry, walking distance, and travel time. The app estimates the steepest absolute elevation-sample angle as `atan(abs(Δelevation) / horizontal distance)`. The Google contour endpoint samples Google walking durations at five candidate distances along each of 24 directions, interpolates between the closest inside/outside travel-time candidates, then verifies the estimated edge with route geometry and elevation samples. The map fills only runs of adjacent successful directions and leaves gaps where a route is missing or fails the slope limit. This is still a sampled approximation, not a complete pedestrian-network isochrone; it can miss alleys, route alternatives, stairs, kerbs, crossing quality, surface condition, closures, and step-free entrances. Elevation resolution may miss short ramps or steps. Field checks and a verified pedestrian network are needed before product or policy decisions.
 
 The 3D section is based on returned route elevation samples. The detailed 3D tile modes need either the configured Google key or LandsD 3D Visualisation API key; the static GitHub Pages preview does not include server secrets. Treat every result as exploratory, not as an accessibility certification. Lands Department routes require the map-face logo and copyright attribution shown in the interface. Google map data must retain required attribution and be used under the applicable Maps Platform terms.
 
