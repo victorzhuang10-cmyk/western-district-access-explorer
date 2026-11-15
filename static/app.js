@@ -148,7 +148,7 @@ function applyPresentation() {
         map.setPaintProperty(layer.id, 'fill-extrusion-opacity', style === 'diagram' ? .96 : .72);
       } else if (layer.id === 'reach-mask-fill') {
         map.setLayoutProperty(layer.id, 'visibility', view === 'reach' ? 'visible' : 'none');
-        map.setPaintProperty(layer.id, 'fill-opacity', style === 'diagram' ? .82 : .4);
+        map.setPaintProperty(layer.id, 'fill-opacity', style === 'diagram' ? .98 : .92);
       } else if (layer.id.startsWith('walk-buffer-')) {
         map.setLayoutProperty(layer.id, 'visibility', view === 'reach' || view === 'map' ? 'visible' : 'none');
       } else if (!['accessible-route-casing','accessible-routes','access-place-points','access-place-labels','origin-point','origin-label'].includes(layer.id)) {
