@@ -382,7 +382,11 @@ function renderMapLibreSvgRoutes() {
     const label = escapeHtml(p.name);
     return `<path class="map-route-casing" d="${d}"/><path class="map-route-line" d="${d}"/><circle class="map-route-endpoint" cx="${end.x.toFixed(1)}" cy="${end.y.toFixed(1)}" r="7" fill="${color}"/><text class="map-route-label" x="${(end.x + 12).toFixed(1)}" y="${(end.y - 10).toFixed(1)}">${label}</text>`;
   }).join('');
-  svg.innerHTML = markup;
+  const origin = map.project([ORIGIN.longitude, ORIGIN.latitude]);
+  const originMarkup = Number.isFinite(origin.x) && Number.isFinite(origin.y)
+    ? `<circle class="map-route-origin-halo" cx="${origin.x.toFixed(1)}" cy="${origin.y.toFixed(1)}" r="12"/><circle class="map-route-origin-dot" cx="${origin.x.toFixed(1)}" cy="${origin.y.toFixed(1)}" r="7"/><text class="map-route-label map-origin-label" x="${(origin.x + 14).toFixed(1)}" y="${(origin.y - 11).toFixed(1)}">COMMUNITY CENTRE</text>`
+    : '';
+  svg.innerHTML = `${markup}${originMarkup}`;
 }
 function addMapLibreLayers(map) {
   map.addSource('openfreemap', { type: 'vector', url: 'https://tiles.openfreemap.org/planet' });
