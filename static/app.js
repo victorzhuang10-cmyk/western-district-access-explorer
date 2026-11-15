@@ -147,6 +147,7 @@ function setView(mode) {
 }
 function applyPresentation() {
   const style = currentStyle(), view = state.view, threeD = view !== 'map';
+  const blockDiagram = view === 'reach' && style === 'diagram';
   const useCesium = threeD && style === 'detailed' && Boolean(state.map);
   $('cesium-container').style.display = useCesium ? 'block' : 'none';
   $('maplibre-container').style.display = useCesium || !state.maplibre ? 'none' : 'block';
@@ -168,24 +169,23 @@ function applyPresentation() {
     const map = state.maplibre;
     for (const layer of map.getStyle().layers) {
       if (layer.id === '3d-buildings-context') {
-        map.setLayoutProperty(layer.id, 'visibility', threeD && view === 'reach' && style === 'diagram' ? 'visible' : 'none');
+        map.setLayoutProperty(layer.id, 'visibility', 'none');
         map.setPaintProperty(layer.id, 'fill-extrusion-color', '#f7f7f4');
         map.setPaintProperty(layer.id, 'fill-extrusion-opacity', .98);
       } else if (layer.id === '3d-buildings') {
-        map.setLayoutProperty(layer.id, 'visibility', threeD ? 'visible' : 'none');
+        map.setLayoutProperty(layer.id, 'visibility', threeD && !blockDiagram ? 'visible' : 'none');
         map.setPaintProperty(layer.id, 'fill-extrusion-color', view === 'reach' && style === 'diagram' ? '#bed8c7' : style === 'diagram' ? '#e5e4dc' : '#aebcac');
         map.setPaintProperty(layer.id, 'fill-extrusion-opacity', .94);
       } else if (layer.id === 'reach-mask-fill') {
-        map.setLayoutProperty(layer.id, 'visibility', view === 'reach' && style === 'diagram' ? 'visible' : 'none');
+        map.setLayoutProperty(layer.id, 'visibility', 'none');
         map.setPaintProperty(layer.id, 'fill-color', '#f6f6f2');
         map.setPaintProperty(layer.id, 'fill-opacity', .84);
       } else if (layer.id === 'reach-block-buildings') {
-        map.setLayoutProperty(layer.id, 'visibility', view === 'reach' && style === 'diagram' ? 'visible' : 'none');
-        map.setPaintProperty(layer.id, 'fill-extrusion-color', '#bed8c7');
+        map.setLayoutProperty(layer.id, 'visibility', blockDiagram ? 'visible' : 'none');
+        map.setPaintProperty(layer.id, 'fill-extrusion-color', ['case', ['boolean', ['get', 'reachable'], false], '#bed8c7', '#f7f7f4']);
         map.setPaintProperty(layer.id, 'fill-extrusion-opacity', .98);
       } else if (layer.id.startsWith('walk-buffer-')) {
-        const showGroundFill = !(view === 'reach' && style === 'diagram' && layer.id === 'walk-buffer-fill');
-        map.setLayoutProperty(layer.id, 'visibility', (view === 'reach' || view === 'map') && showGroundFill ? 'visible' : 'none');
+        map.setLayoutProperty(layer.id, 'visibility', (view === 'reach' || view === 'map') && !blockDiagram ? 'visible' : 'none');
         if (layer.id === 'walk-buffer-fill') {
           map.setPaintProperty(layer.id, 'fill-color', style === 'diagram' ? '#b9ddc8' : '#7eb297');
           map.setPaintProperty(layer.id, 'fill-opacity', style === 'diagram' ? .62 : .35);
@@ -383,6 +383,9 @@ function segmentsCross(a, b, c, d) {
 function polygonsTouch(a, b) {
   if (!a?.[0]?.length || !b?.[0]?.length) return false;
   const ar = a[0], br = b[0];
+  const bounds = ring => ring.reduce((box, point) => [Math.min(box[0], point[0]), Math.min(box[1], point[1]), Math.max(box[2], point[0]), Math.max(box[3], point[1])], [Infinity, Infinity, -Infinity, -Infinity]);
+  const [ax0, ay0, ax1, ay1] = bounds(ar), [bx0, by0, bx1, by1] = bounds(br);
+  if (ax1 < bx0 || bx1 < ax0 || ay1 < by0 || by1 < ay0) return false;
   if (ar.some(point => pointInPolygon(point, b)) || br.some(point => pointInPolygon(point, a))) return true;
   for (let i = 0; i < ar.length - 1; i += 1) for (let j = 0; j < br.length - 1; j += 1) {
     if (segmentsCross(ar[i], ar[i + 1], br[j], br[j + 1])) return true;
@@ -408,20 +411,27 @@ function updateReachBuildingBlocks() {
   let tiles = [];
   try { tiles = map.querySourceFeatures('openfreemap', { sourceLayer: 'building', filter: ['!=', ['get', 'hide_3d'], true] }); }
   catch (error) { console.warn('OpenFreeMap building footprints are not ready.', error); }
-  const seen = new Set();
-  const selected = tiles.filter(feature => {
-    if (!feature.geometry || !geometriesTouch(feature.geometry, geometry)) return false;
+  const seen = new Set(), unique = [];
+  tiles.forEach(feature => {
+    if (!feature.geometry || !['Polygon', 'MultiPolygon'].includes(feature.geometry.type)) return false;
     const key = JSON.stringify(feature.geometry.coordinates);
-    if (seen.has(key)) return false;
-    seen.add(key); return true;
-  }).map(feature => ({
+    if (seen.has(key)) return;
+    seen.add(key); unique.push({ feature, key });
+  });
+  let contentHash = 2166136261;
+  const buildings = unique.map(({ feature, key }) => {
+    const reachable = geometriesTouch(feature.geometry, geometry);
+    for (let i = 0; i < key.length; i += 1) contentHash = Math.imul(contentHash ^ key.charCodeAt(i), 16777619);
+    contentHash = Math.imul(contentHash ^ Number(reachable), 16777619);
+    return {
     type: 'Feature',
-    properties: { render_height: Number(feature.properties?.render_height) || 15, render_min_height: Number(feature.properties?.render_min_height) || 0 },
+    properties: { render_height: Number(feature.properties?.render_height) || 15, render_min_height: Number(feature.properties?.render_min_height) || 0, reachable },
     geometry: feature.geometry,
-  }));
-  const signature = `${state.originVersion}/${state.distanceMetres}/${state.slope}/${state.stepSlope}/${selected.length}/${[...seen].join('|')}`;
+  };
+  });
+  const signature = `${state.originVersion}/${state.distanceMetres}/${state.slope}/${state.stepSlope}/${buildings.length}/${contentHash >>> 0}`;
   if (signature === state.reachBlocksSignature) return;
-  source.setData({ type: 'FeatureCollection', features: selected });
+  source.setData({ type: 'FeatureCollection', features: buildings });
   state.reachBlocksSignature = signature;
 }
 function haversineMetres(a, b) {
@@ -605,7 +615,7 @@ function renderMapLibreSvgRoutes() {
   const map = state.maplibre, svg = $('map-route-overlay'); if (!map || !svg) return;
   const { width, height } = map.getContainer().getBoundingClientRect();
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`); svg.setAttribute('preserveAspectRatio', 'none');
-  const geometry = (state.view === 'reach' || state.view === 'map') ? state.isochrone?.geometry : null;
+  const geometry = (state.view === 'reach' || state.view === 'map') && !(state.view === 'reach' && state.reachStyle === 'diagram') ? state.isochrone?.geometry : null;
   const rings = geometry?.type === 'Polygon' ? [geometry.coordinates[0]] : geometry?.type === 'MultiPolygon' ? geometry.coordinates.map(polygon => polygon[0]) : [];
   const bufferMarkup = rings.map(ring => {
     const screen = ring.map(point => map.project(point.slice(0, 2)));
@@ -641,7 +651,7 @@ function addMapLibreLayers(map) {
   map.addSource('map-origin', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addSource('reach-block-buildings', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addLayer({ id: 'reach-mask-fill', type: 'fill', source: 'reach-mask', paint: { 'fill-color': '#f3f4ed', 'fill-opacity': .78 } });
-  map.addLayer({ id: 'reach-block-buildings', type: 'fill-extrusion', source: 'reach-block-buildings', layout: { visibility: 'none' }, paint: { 'fill-extrusion-color': '#bed8c7', 'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 15], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0], 'fill-extrusion-opacity': .98 } });
+  map.addLayer({ id: 'reach-block-buildings', type: 'fill-extrusion', source: 'reach-block-buildings', layout: { visibility: 'none' }, paint: { 'fill-extrusion-color': ['case', ['boolean', ['get', 'reachable'], false], '#bed8c7', '#f7f7f4'], 'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 15], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0], 'fill-extrusion-opacity': .98 } });
   map.addLayer({ id: 'walk-buffer-fill', type: 'fill', source: 'walk-buffer', paint: { 'fill-color': '#cb634c', 'fill-opacity': .24 } });
   map.addLayer({ id: 'walk-buffer-outline', type: 'line', source: 'walk-buffer', paint: { 'line-color': '#c85d45', 'line-width': 2.5, 'line-dasharray': [2, 2], 'line-opacity': .95 } });
   map.addLayer({ id: 'accessible-route-casing', type: 'line', source: 'access-routes', paint: { 'line-color': '#fffdf6', 'line-width': 9, 'line-opacity': .96 } });
