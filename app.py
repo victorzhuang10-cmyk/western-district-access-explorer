@@ -6,7 +6,7 @@ import os
 import asyncio
 import json
 from pathlib import Path
-from urllib.parse import urljoin, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 import httpx
 from dotenv import load_dotenv
@@ -97,7 +97,7 @@ async def google_3d_tiles(tile_path: str, request: Request):
                         absolute = urljoin(url, item)
                         parsed = urlsplit(absolute)
                         if parsed.hostname == "tile.googleapis.com" and parsed.path.startswith("/v1/3dtiles/"):
-                            value[key] = urlunsplit(("", "", "/api/google-3d-tiles" + parsed.path, parsed.query, parsed.fragment))
+                            value[key] = urlunsplit(("", "", "/api/google-3d-tiles" + parsed.path, strip_api_key(parsed.query), parsed.fragment))
                     else:
                         proxy_tile_uris(item)
             elif isinstance(value, list):
@@ -136,7 +136,7 @@ async def landsd_3d_tiles(tile_path: str, request: Request):
                         parsed = urlsplit(absolute)
                         if parsed.hostname == "data.map.gov.hk" and "/api/3d-data/3dtiles/f2/" in parsed.path:
                             tile = parsed.path.split("/api/3d-data/3dtiles/", 1)[1]
-                            value[key] = urlunsplit(("", "", "/api/landsd-3d-tiles/" + tile, parsed.query, parsed.fragment))
+                            value[key] = urlunsplit(("", "", "/api/landsd-3d-tiles/" + tile, strip_api_key(parsed.query), parsed.fragment))
                     else:
                         proxy_tile_uris(item)
             elif isinstance(value, list):
@@ -145,6 +145,11 @@ async def landsd_3d_tiles(tile_path: str, request: Request):
         proxy_tile_uris(document)
         content = json.dumps(document, separators=(",", ":")).encode("utf-8")
     return Response(content, media_type=content_type)
+
+
+def strip_api_key(query: str) -> str:
+    """Remove credentials returned in upstream tile links before sending them to browsers."""
+    return urlencode([(key, value) for key, value in parse_qsl(query, keep_blank_values=True) if key.lower() not in {"key", "api_key"}], doseq=True)
 
 
 def decode_polyline(encoded: str) -> list[tuple[float, float]]:
@@ -165,6 +170,22 @@ def decode_polyline(encoded: str) -> list[tuple[float, float]]:
         lng += values[1]
         points.append((lat / 1e5, lng / 1e5))
     return points
+
+
+def encode_polyline(points: list[tuple[float, float]]) -> str:
+    """Encode latitude/longitude vertices for Google's compact Elevation path request."""
+    previous_lat = previous_lng = 0
+    output = []
+    for latitude, longitude in points:
+        lat, lng = round(latitude * 1e5), round(longitude * 1e5)
+        for delta in (lat - previous_lat, lng - previous_lng):
+            value = ~(delta << 1) if delta < 0 else delta << 1
+            while value >= 0x20:
+                output.append(chr((0x20 | (value & 0x1F)) + 63))
+                value >>= 5
+            output.append(chr(value + 63))
+        previous_lat, previous_lng = lat, lng
+    return "".join(output)
 
 
 def haversine(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -194,8 +215,11 @@ async def google_route(client: httpx.AsyncClient, origin: dict, dest: Destinatio
     if len(coords) > 512:
         stride = math.ceil((len(coords) - 1) / 511)
         coords = coords[::stride] + ([coords[-1]] if coords[-1] != coords[::stride][-1] else [])
-    path = "|".join(f"{lat},{lng}" for lat, lng in coords)
-    elev_response = await client.get("https://maps.googleapis.com/maps/api/elevation/json", params={"path": path, "samples": min(512, max(2, len(coords))), "key": API_KEY})
+    encoded_path = encode_polyline(coords)
+    route_distance = float(route.get("distanceMeters", 0))
+    # About one height sample per 5 m, capped at Google's 512 sample limit.
+    samples_count = min(512, max(2, math.ceil(route_distance / 5) + 1))
+    elev_response = await client.get("https://maps.googleapis.com/maps/api/elevation/json", params={"path": f"enc:{encoded_path}", "samples": samples_count, "key": API_KEY})
     elev_response.raise_for_status()
     elev = elev_response.json()
     if elev.get("status") != "OK" or not elev.get("results"):
