@@ -88,3 +88,6 @@
   .map-caption { left: 18px; bottom: 18px; }
   .view-switcher { right: 18px; bottom: 18px; width: 264px; }
 }
+.map-route-origin-halo { fill: #fffdf6; stroke: #c94f37; stroke-width: 3; }
+.map-route-origin-dot { fill: #c94f37; stroke: #fffdf6; stroke-width: 2; }
+.map-origin-label { fill: #934633; }
