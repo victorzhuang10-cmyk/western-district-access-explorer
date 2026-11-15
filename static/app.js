@@ -3,7 +3,7 @@ const MAP_CENTER = { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude };
 const $ = (id) => document.getElementById(id);
 const apiUrl = (path) => new URL(`${location.pathname.includes('/static/') ? '../' : './'}api/${path}`, document.baseURI).toString();
 const staticUrl = (path) => new URL(`./${path}`, document.baseURI).toString();
-const state = { distanceMetres: 300, walkTimeSeconds: 300, slope: 10, filter: 'all', view: 'map', mapStyle: 'detailed', massingStyle: 'detailed', reachStyle: 'detailed', places: [], google: false, isochrone: null, boundarySamples: 0, sectionPlaceId: null, map: null, maplibre: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, googleAnalysisVersion: 0, googleController: null, routeFailures: new Set(), boundaryCache: new Map() };
+const state = { distanceMetres: 300, walkTimeSeconds: 300, slope: 10, filter: 'all', view: 'massing', mapStyle: 'detailed', massingStyle: 'detailed', reachStyle: 'detailed', places: [], google: false, isochrone: null, boundarySamples: 0, sectionPlaceId: null, map: null, maplibre: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, googleAnalysisVersion: 0, googleController: null, routeFailures: new Set(), boundaryCache: new Map() };
 
 function formatDistance(m) { return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`; }
 function durationMinutes(p) { return p.duration_s != null ? p.duration_s / 60 : null; }
@@ -148,6 +148,7 @@ function applyPresentation() {
         map.setPaintProperty(layer.id, 'fill-extrusion-opacity', style === 'diagram' ? .96 : .72);
       } else if (layer.id === 'reach-mask-fill') {
         map.setLayoutProperty(layer.id, 'visibility', view === 'reach' ? 'visible' : 'none');
+        map.setPaintProperty(layer.id, 'fill-opacity', style === 'diagram' ? .82 : .4);
       } else if (layer.id.startsWith('walk-buffer-')) {
         map.setLayoutProperty(layer.id, 'visibility', view === 'reach' || view === 'map' ? 'visible' : 'none');
       } else if (!['accessible-route-casing','accessible-routes','access-place-points','access-place-labels','origin-point','origin-label'].includes(layer.id)) {
@@ -411,7 +412,7 @@ function initMapLibre() {
     try { addMapLibreLayers(map); }
     catch (error) { console.error('Could not add 3D building layer', error); showToast('Map loaded, but building extrusions are unavailable.'); }
     $('data-status').textContent = 'OPENSTREETMAP 3D BUILDINGS · CSDI DESTINATIONS';
-    $('map-data-label').textContent = '3D BUILDINGS · OSM STREET MAP'; $('map-attribution').textContent = 'Map from Lands Department · © OpenStreetMap contributors';
+    $('map-data-label').textContent = '3D BUILDINGS · OSM STREET MAP'; $('map-attribution').textContent = '© OpenStreetMap contributors · OpenFreeMap · routes/data © Lands Department';
     map.once('idle', () => { applyPresentation(); renderMapLibreOverlays(); });
   });
   map.on('error', e => { if (e.error) console.warn('MapLibre tile/style issue:', e.error.message); });

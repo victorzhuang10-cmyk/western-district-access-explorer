@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
   <link href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=hill-court-14" />
+  <link rel="stylesheet" href="./styles.css?v=views-15" />
 </head>
 <body>
   <header class="topbar">
@@ -65,17 +65,17 @@
       <div id="cesium-container" class="map-canvas"></div>
       <div id="maplibre-container" class="map-canvas" aria-label="Interactive 3D map with OpenStreetMap buildings"></div>
       <svg id="map-route-overlay" class="map-route-overlay" aria-hidden="true"></svg>
-      <div class="map-topline"><div class="map-context"><span class="context-mark">⌖</span><span><b>SAI YING PUN</b><small>WESTERN DISTRICT, HONG KONG</small></span></div><div class="map-live"><i></i> <span id="map-data-label">2D MAP · HILL COURT, 28 HILL ROAD</span></div></div>
+      <div class="map-topline"><div class="map-context"><span class="context-mark">⌖</span><span><b>SAI YING PUN</b><small>WESTERN DISTRICT, HONG KONG</small></span></div><div class="map-live"><i></i> <span id="map-data-label">3D DETAILED MASSING · ACCESS ROUTES</span></div></div>
       <div class="map-controls"><button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button><button id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button><span></span><button id="reset-view" title="Reset view" aria-label="Reset view">⌖</button></div>
 
       <div class="map-caption"><span class="caption-mark">3D</span><span><b>WALK-TIME REACH</b><small>ROUTED TIME · PATHS · SLOPE</small></span><span class="caption-rule"></span><span class="caption-radius"><b id="caption-distance">5</b> MIN</span></div>
 
       <div id="section-panel" class="section-panel" aria-label="3D elevation section" hidden></div>
       <div class="view-switcher" aria-label="Map presentation">
-        <div class="switch-copy"><span>MAP PRESENTATION</span><small id="presentation-title">2D map · detailed</small></div>
+        <div class="switch-copy"><span>MAP PRESENTATION</span><small id="presentation-title">3D massing · detailed</small></div>
         <div class="presentation-tabs" role="group" aria-label="Choose map type">
-          <button class="view-option selected" data-view="map" aria-pressed="true"><b>2D MAP</b></button>
-          <button class="view-option" data-view="massing" aria-pressed="false"><b>3D MASSING</b></button>
+          <button class="view-option" data-view="map" aria-pressed="false"><b>2D MAP</b></button>
+          <button class="view-option selected" data-view="massing" aria-pressed="true"><b>3D MASSING</b></button>
           <button class="view-option" data-view="reach" aria-pressed="false"><b>3D REACH</b></button>
         </div>
         <div class="style-tabs" role="group" aria-label="Map detail style"><button class="style-option selected" data-style="detailed" aria-pressed="true">Detailed</button><button class="style-option" data-style="diagram" aria-pressed="false">Diagram</button></div>
@@ -94,6 +94,6 @@
 
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Cesium.js"></script>
   <script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.2/dist/maplibre-gl.js'"></script>
-  <script src="./app.js?v=hill-court-14"></script>
+  <script src="./app.js?v=views-15"></script>
 </body>
 </html>
