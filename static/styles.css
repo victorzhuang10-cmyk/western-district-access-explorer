@@ -118,6 +118,5 @@
 .map-origin-label { fill: #934633; }
 .map-reach-buffer{fill:#68a88680;stroke:#174f3c;stroke-width:4;stroke-linejoin:round;vector-effect:non-scaling-stroke;fill-rule:evenodd}
 .diagram-mode .map-reach-buffer{fill:#73b58fbb;stroke:#174f3c;stroke-width:6}
-.reach-mode.diagram-mode .map-reach-buffer{fill:none}
 .map-shell:not(.reach-mode) .map-reach-buffer{fill:#68a88645;stroke:#276d5d;stroke-width:3}
 .step-slope-title{margin-top:12px!important}.range-step-slope::-webkit-slider-thumb{border-color:var(--blue)}.range-step-slope::-moz-range-thumb{border-color:var(--blue)}

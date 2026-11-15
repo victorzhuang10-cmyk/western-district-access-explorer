@@ -3,13 +3,14 @@ const MAP_CENTER = { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude };
 const $ = (id) => document.getElementById(id);
 const apiUrl = (path) => new URL(`${location.pathname.includes('/static/') ? '../' : './'}api/${path}`, document.baseURI).toString();
 const staticUrl = (path) => new URL(`./${path}`, document.baseURI).toString();
-const state = { distanceMetres: 300, walkTimeSeconds: 300, slope: 30, stepSlope: 15, filter: 'all', view: 'map', mapStyle: 'detailed', massingStyle: 'diagram', reachStyle: 'diagram', places: [], google: false, isochrone: null, boundarySamples: 0, sectionPlaceId: null, map: null, maplibre: null, mapBasePaint: new Map(), tileset: null, clippingSignature: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, googleAnalysisVersion: 0, googleController: null, routeFailures: new Set(), boundaryCache: new Map(), boundaryRouteCache: new Map(), reachBlocksSignature: null };
+const state = { distanceMetres: 300, walkTimeSeconds: 300, slope: 30, stepSlope: 15, filter: 'all', view: 'map', mapStyle: 'detailed', massingStyle: 'diagram', reachStyle: 'diagram', places: [], google: false, isochrone: null, expandedReach: null, boundarySamples: 0, sectionPlaceId: null, map: null, maplibre: null, mapBasePaint: new Map(), tileset: null, clippingSignature: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, googleAnalysisVersion: 0, googleController: null, routeFailures: new Set(), boundaryCache: new Map(), boundaryRouteCache: new Map(), reachBlocksSignature: null, reachExpansionVersion: 0 };
 
 function formatDistance(m) { return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`; }
 function durationMinutes(p) { return p.duration_s != null ? p.duration_s / 60 : null; }
 function routeGrade(p) { return Number(p.route_grade_deg ?? 0); }
 function stepGrade(p) { return Number(p.max_step_slope_deg ?? p.max_slope_deg ?? 0); }
 function accessible(p) { return Boolean(p.routeAnalysis && p.route_exists !== false && Number(p.duration_s) <= state.walkTimeSeconds && routeGrade(p) <= state.slope && stepGrade(p) <= state.stepSlope && p.accessible !== false); }
+function displayedReach() { return state.expandedReach || state.isochrone; }
 function status(p) {
   if (!p.routeAnalysis) return [p.routeError ? 'ROUTE UNAVAILABLE' : 'ROUTE PENDING', 'pending'];
   if (p.route_exists === false) return ['NO WALK ROUTE', 'outside'];
@@ -28,7 +29,7 @@ function candidateDistanceLimit() { return Math.min(4000, state.distanceMetres *
 function candidatePlaces() { const limit = candidateDistanceLimit(); return state.places.filter(p => Number(p.study_distance_m) <= limit); }
 function setRange(analyze = true) {
   const nextDistance = Number($('distance').value), nextSlope = Number($('slope').value), nextStepSlope = Number($('step-slope').value);
-  if (nextDistance !== state.distanceMetres || nextSlope !== state.slope || nextStepSlope !== state.stepSlope) state.isochrone = null;
+  if (nextDistance !== state.distanceMetres || nextSlope !== state.slope || nextStepSlope !== state.stepSlope) { state.isochrone = null; state.expandedReach = null; state.reachBlocksSignature = null; }
   state.distanceMetres = nextDistance; state.walkTimeSeconds = state.distanceMetres; state.slope = nextSlope; state.stepSlope = nextStepSlope;
   $('distance-value').textContent = state.distanceMetres; $('slope-value').textContent = state.slope; $('step-slope-value').textContent = state.stepSlope;
   $('walk-time').textContent = `${(state.walkTimeSeconds / 60).toFixed(state.walkTimeSeconds % 60 ? 1 : 0)} min`;
@@ -185,7 +186,7 @@ function applyPresentation() {
         map.setPaintProperty(layer.id, 'fill-extrusion-color', ['case', ['boolean', ['get', 'reachable'], false], '#bed8c7', '#f7f7f4']);
         map.setPaintProperty(layer.id, 'fill-extrusion-opacity', .98);
       } else if (layer.id.startsWith('walk-buffer-')) {
-        map.setLayoutProperty(layer.id, 'visibility', (view === 'reach' || view === 'map') && !blockDiagram ? 'visible' : 'none');
+        map.setLayoutProperty(layer.id, 'visibility', (view === 'reach' || view === 'map') ? 'visible' : 'none');
         if (layer.id === 'walk-buffer-fill') {
           map.setPaintProperty(layer.id, 'fill-color', style === 'diagram' ? '#b9ddc8' : '#7eb297');
           map.setPaintProperty(layer.id, 'fill-opacity', style === 'diagram' ? .62 : .35);
@@ -207,13 +208,13 @@ function applyPresentation() {
         else if (style !== 'diagram' && original?.lineColor !== undefined && layer.type === 'line') map.setPaintProperty(layer.id, 'line-color', original.lineColor);
       }
     }
-    if (!(view === 'reach' && ['Polygon','MultiPolygon'].includes(state.isochrone?.geometry?.type))) map.flyTo({ center: [ORIGIN.longitude, ORIGIN.latitude], zoom: threeD ? 16.7 : 15.6, pitch: threeD ? 48 : 0, bearing: threeD && style === 'detailed' ? -12 : 0, duration: 550 });
-    requestAnimationFrame(() => { map.resize(); if (view === 'reach' && ['Polygon','MultiPolygon'].includes(state.isochrone?.geometry?.type)) fitReachView(); });
+    if (!(view === 'reach' && ['Polygon','MultiPolygon'].includes(displayedReach()?.geometry?.type))) map.flyTo({ center: [ORIGIN.longitude, ORIGIN.latitude], zoom: threeD ? 16.7 : 15.6, pitch: threeD ? 48 : 0, bearing: threeD && style === 'detailed' ? -12 : 0, duration: 550 });
+    requestAnimationFrame(() => { map.resize(); if (view === 'reach' && ['Polygon','MultiPolygon'].includes(displayedReach()?.geometry?.type)) fitReachView(); });
   }
   if (state.map) {
     state.map.scene.screenSpaceCameraController.enableTilt = threeD;
     syncCesiumReachClip();
-    if (view === 'reach' && ['Polygon','MultiPolygon'].includes(state.isochrone?.geometry?.type)) fitReachView();
+    if (view === 'reach' && ['Polygon','MultiPolygon'].includes(displayedReach()?.geometry?.type)) fitReachView();
     else state.map.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(ORIGIN.longitude, ORIGIN.latitude, threeD ? Math.max(700, state.distanceMetres * 3.2) : 1750), orientation: { heading: 0, pitch: Cesium.Math.toRadians(threeD ? -50 : -72), roll: 0 }, duration: .6 });
   }
   $('map-data-label').textContent = view === 'map' ? `2D CITY · ${styleName.toUpperCase()} · WALK BUFFER` : view === 'massing' ? `3D CITY · ${styleName.toUpperCase()} · ACCESS ROUTES` : `3D REACH · ${styleName.toUpperCase()} · ${state.boundarySamples}/24 SAMPLE DIRECTIONS`;
@@ -229,7 +230,7 @@ function syncCesiumReachClip() {
 }
 
 function fitReachView() {
-  const geometry = state.isochrone?.geometry;
+  const geometry = displayedReach()?.geometry;
   const rings = geometry?.type === 'Polygon' ? [geometry.coordinates[0]] : geometry?.type === 'MultiPolygon' ? geometry.coordinates.map(polygon => polygon[0]) : [];
   const pointsInReach = rings.flatMap(ring => ring.slice(0, -1));
   if (!pointsInReach.length) return;
@@ -261,7 +262,7 @@ function renderCesiumOverlays() {
   const originHeightReference = originRoute ? Cesium.HeightReference.NONE : Cesium.HeightReference.CLAMP_TO_GROUND;
   const origin = state.map.entities.add({ position: Cesium.Cartesian3.fromDegrees(ORIGIN.longitude, ORIGIN.latitude, originHeight), point: { pixelSize: 12, color: Cesium.Color.fromCssColorString('#cb5237'), outlineColor: Cesium.Color.WHITE, outlineWidth: 3, heightReference: originHeightReference }, label: { text: 'COMMUNITY CENTRE', font: '12px DM Sans', pixelOffset: new Cesium.Cartesian2(16, -12), fillColor: Cesium.Color.fromCssColorString('#9e4535'), outlineColor: Cesium.Color.WHITE, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, heightReference: originHeightReference } });
   state.markerEntities.push(origin);
-  const ring = (state.view === 'reach' || state.view === 'map') ? state.isochrone?.geometry : null;
+  const ring = (state.view === 'reach' || state.view === 'map') ? displayedReach()?.geometry : null;
   const reachPolygons = ring?.type === 'Polygon' ? [ring.coordinates] : ring?.type === 'MultiPolygon' ? ring.coordinates : [];
   for (const polygonCoordinates of reachPolygons) {
     const coordinates = polygonCoordinates[0];
@@ -316,15 +317,10 @@ function renderSectionMap() {
 function renderMapLibreOverlays() {
   const map = state.maplibre; if (!map || !map.getSource('access-routes')) return;
   const buildingBaseFilter = ['!=', ['get', 'hide_3d'], true];
-  const reachGeometry = state.view === 'reach' ? state.isochrone?.geometry : null;
+  const reachGeometry = state.view === 'reach' ? displayedReach()?.geometry : null;
   const hasReachGeometry = ['Polygon','MultiPolygon'].includes(reachGeometry?.type);
-  if (state.view === 'reach' && state.reachStyle === 'diagram' && hasReachGeometry) {
-    map.setFilter('3d-buildings-context', ['all', buildingBaseFilter, ['!', ['within', reachGeometry]]]);
-    map.setFilter('3d-buildings', ['all', buildingBaseFilter, ['within', reachGeometry]]);
-  } else {
-    map.setFilter('3d-buildings-context', buildingBaseFilter);
-    map.setFilter('3d-buildings', buildingBaseFilter);
-  }
+  map.setFilter('3d-buildings-context', buildingBaseFilter);
+  map.setFilter('3d-buildings', buildingBaseFilter);
   const inReach = state.places.filter(p => accessible(p) && (state.filter === 'all' || p.kind === state.filter));
   const routes = inReach.filter(p => p.path?.length).map(p => ({ type: 'Feature', properties: { id: p.id, name: p.name, kind: p.kind }, geometry: { type: 'LineString', coordinates: p.path.map(c => c.slice(0, 2)) } }));
   const places = inReach.filter(p => p.coordinates).map(p => {
@@ -333,11 +329,12 @@ function renderMapLibreOverlays() {
   });
   const routeData = { type: 'FeatureCollection', features: routes };
   const placeData = { type: 'FeatureCollection', features: places };
-  const bufferData = { type: 'FeatureCollection', features: state.isochrone && (state.view === 'reach' || state.view === 'map') ? [state.isochrone] : [] };
+  const reachFeature = displayedReach();
+  const bufferData = { type: 'FeatureCollection', features: reachFeature && (state.view === 'reach' || state.view === 'map') ? [reachFeature] : [] };
   const extent = Array.from({length: 8}, (_, i) => radialDestination(ORIGIN, 12000, i * 45)); extent.push(extent[0]);
   const signedArea = ring => ring.slice(0, -1).reduce((area, point, i) => { const next = ring[i + 1]; return area + point[0] * next[1] - next[0] * point[1]; }, 0) / 2;
   if (signedArea(extent) < 0) extent.reverse();
-  const maskGeometry = state.isochrone?.geometry;
+  const maskGeometry = reachFeature?.geometry;
   const innerRings = maskGeometry?.type === 'Polygon'
     ? [maskGeometry.coordinates[0].map(point => point.slice())]
     : maskGeometry?.type === 'MultiPolygon'
@@ -404,7 +401,7 @@ function updateReachBuildingBlocks() {
   const map = state.maplibre, source = map?.getSource('reach-block-buildings');
   if (!source) return;
   const geometry = state.isochrone?.geometry;
-  if (!(state.view === 'reach' && state.reachStyle === 'diagram') || !['Polygon', 'MultiPolygon'].includes(geometry?.type)) {
+  if (!((state.view === 'reach' && state.reachStyle === 'diagram') || state.view === 'map') || !['Polygon', 'MultiPolygon'].includes(geometry?.type)) {
     if (state.reachBlocksSignature !== 'off') { source.setData({ type: 'FeatureCollection', features: [] }); state.reachBlocksSignature = 'off'; }
     return;
   }
@@ -419,8 +416,10 @@ function updateReachBuildingBlocks() {
     seen.add(key); unique.push({ feature, key });
   });
   let contentHash = 2166136261;
+  const edgeFeatures = [];
   const buildings = unique.map(({ feature, key }) => {
     const reachable = geometriesTouch(feature.geometry, geometry);
+    if (reachable && !geometryFullyContains(geometry, feature.geometry)) edgeFeatures.push({ type: 'Feature', properties: {}, geometry: feature.geometry });
     for (let i = 0; i < key.length; i += 1) contentHash = Math.imul(contentHash ^ key.charCodeAt(i), 16777619);
     contentHash = Math.imul(contentHash ^ Number(reachable), 16777619);
     return {
@@ -433,6 +432,47 @@ function updateReachBuildingBlocks() {
   if (signature === state.reachBlocksSignature) return;
   source.setData({ type: 'FeatureCollection', features: buildings });
   state.reachBlocksSignature = signature;
+  expandReachToBuildingEdges(geometry, edgeFeatures, signature);
+}
+function geometryFullyContains(container, candidate) {
+  const parts = polygonParts(container), candidateParts = polygonParts(candidate);
+  if (!parts.length || !candidateParts.length) return false;
+  const containsPoint = point => parts.some(part => pointInPolygon(point, part));
+  for (const polygon of candidateParts) {
+    const ring = polygon[0] || [];
+    if (ring.length < 4) return false;
+    for (let i = 0; i < ring.length - 1; i += 1) {
+      const a = ring[i], b = ring[i + 1];
+      if (!containsPoint(a) || !containsPoint([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2])) return false;
+      for (const target of parts) for (let j = 0; j < (target[0]?.length || 0) - 1; j += 1) {
+        if (segmentsCross(a, b, target[0][j], target[0][j + 1])) return false;
+      }
+    }
+  }
+  return true;
+}
+let turfUnionPromise;
+async function expandReachToBuildingEdges(baseGeometry, edgeFeatures, signature) {
+  const version = ++state.reachExpansionVersion;
+  if (!edgeFeatures.length) {
+    state.expandedReach = null;
+    renderMapLibreOverlays(); renderCesiumOverlays(); fitReachView();
+    return;
+  }
+  try {
+    turfUnionPromise ||= import('https://cdn.jsdelivr.net/npm/@turf/union@7.4.0/+esm');
+    const module = await turfUnionPromise;
+    const unionFn = module.union || module.default?.union;
+    if (typeof unionFn !== 'function') throw new Error('Turf union function is unavailable');
+    const baseFeature = { type: 'Feature', properties: state.isochrone?.properties || {}, geometry: baseGeometry };
+    const expanded = unionFn({ type: 'FeatureCollection', features: [baseFeature, ...edgeFeatures] });
+    if (version !== state.reachExpansionVersion || signature !== state.reachBlocksSignature || !expanded?.geometry) return;
+    state.expandedReach = expanded;
+    renderMapLibreOverlays(); renderCesiumOverlays(); fitReachView();
+  } catch (error) {
+    console.warn('Could not snap walking reach to building footprints; showing sampled route boundary.', error);
+    if (version === state.reachExpansionVersion) { state.expandedReach = null; renderMapLibreOverlays(); renderCesiumOverlays(); }
+  }
 }
 function haversineMetres(a, b) {
   const rad = Math.PI / 180, phi1 = a[1] * rad, phi2 = b[1] * rad;
@@ -572,6 +612,7 @@ async function buildLandsDContour(origin, originVersion) {
   const geometry = boundary.length >= 2 ? sampledReachGeometry(boundary, sampleCount, origin) : null;
   if (geometry) state.isochrone = { type: 'Feature', properties: { method: '24 Lands Department 3D pedestrian-network bearings at 15-degree spacing with progressively closer targets when a long target is disconnected. Reach is bounded by route time, total route grade, and maximum grade between consecutive elevation samples. Unsampled or blocked directions remain open.', sample_count: boundary.length, requested_samples: sampleCount, walk_time_seconds: walkTimeSeconds, equivalent_distance_m: distanceMetres, max_route_slope_deg: maxSlope, max_step_slope_deg: maxStepSlope }, geometry };
   else state.isochrone = null;
+  state.expandedReach = null; state.reachBlocksSignature = null;
   state.boundaryCache.set(cacheKey, state.isochrone);
   $('data-status').textContent = state.isochrone
     ? `LANDS DEPARTMENT 3D ROUTES · ${boundary.length}/${sampleCount} SLOPE-SAFE DIRECTIONS`
@@ -615,14 +656,6 @@ function renderMapLibreSvgRoutes() {
   const map = state.maplibre, svg = $('map-route-overlay'); if (!map || !svg) return;
   const { width, height } = map.getContainer().getBoundingClientRect();
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`); svg.setAttribute('preserveAspectRatio', 'none');
-  const geometry = (state.view === 'reach' || state.view === 'map') && !(state.view === 'reach' && state.reachStyle === 'diagram') ? state.isochrone?.geometry : null;
-  const rings = geometry?.type === 'Polygon' ? [geometry.coordinates[0]] : geometry?.type === 'MultiPolygon' ? geometry.coordinates.map(polygon => polygon[0]) : [];
-  const bufferMarkup = rings.map(ring => {
-    const screen = ring.map(point => map.project(point.slice(0, 2)));
-    if (screen.some(point => !Number.isFinite(point.x) || !Number.isFinite(point.y))) return '';
-    const d = screen.map((point, i) => `${i ? 'L' : 'M'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ') + ' Z';
-    return `<path class="map-reach-buffer" d="${d}"/>`;
-  }).join('');
   const markup = state.places.filter(p => accessible(p) && (state.filter === 'all' || p.kind === state.filter)).map(p => {
     if (!p.path?.length) return '';
     const path = p.path.map(c => c.slice(0, 2));
@@ -637,7 +670,7 @@ function renderMapLibreSvgRoutes() {
   const originMarkup = Number.isFinite(origin.x) && Number.isFinite(origin.y)
     ? `<circle class="map-route-origin-halo" cx="${origin.x.toFixed(1)}" cy="${origin.y.toFixed(1)}" r="12"/><circle class="map-route-origin-dot" cx="${origin.x.toFixed(1)}" cy="${origin.y.toFixed(1)}" r="7"/><text class="map-route-label map-origin-label" x="${(origin.x + 14).toFixed(1)}" y="${(origin.y - 11).toFixed(1)}">COMMUNITY CENTRE</text>`
     : '';
-  svg.innerHTML = `${bufferMarkup}${markup}${originMarkup}`;
+  svg.innerHTML = `${markup}${originMarkup}`;
 }
 function addMapLibreLayers(map) {
   for (const layer of map.getStyle().layers) state.mapBasePaint.set(layer.id, { fillColor: layer.paint?.['fill-color'], lineColor: layer.paint?.['line-color'], visibility: layer.layout?.visibility || 'visible' });
@@ -660,12 +693,14 @@ function addMapLibreLayers(map) {
   map.addLayer({ id: 'access-place-labels', type: 'symbol', source: 'access-places', layout: { 'text-field': ['get', 'name'], 'text-font': ['Open Sans Semibold'], 'text-size': 12, 'text-offset': [0, 1.35], 'text-anchor': 'top', 'text-allow-overlap': false }, paint: { 'text-color': '#26332d', 'text-halo-color': '#f7f6ef', 'text-halo-width': 2 } });
   map.addLayer({ id: 'origin-point', type: 'circle', source: 'map-origin', paint: { 'circle-radius': 10, 'circle-color': '#c94f37', 'circle-stroke-color': '#fffdf6', 'circle-stroke-width': 3 } });
   map.addLayer({ id: 'origin-label', type: 'symbol', source: 'map-origin', layout: { 'text-field': 'COMMUNITY CENTRE', 'text-font': ['Open Sans Semibold'], 'text-size': 11, 'text-offset': [1.2, -.4], 'text-anchor': 'left', 'text-allow-overlap': true }, paint: { 'text-color': '#934633', 'text-halo-color': '#fffdf6', 'text-halo-width': 2 } });
+  const firstBuildingFill = map.getStyle().layers.find(layer => layer.type === 'fill' && layer['source-layer'] === 'building');
+  if (firstBuildingFill && map.getLayer('walk-buffer-fill')) map.moveLayer('walk-buffer-fill', firstBuildingFill.id);
   map.on('click', 'access-place-points', e => { const feature = e.features?.[0]; if (feature) focusPlace(feature.properties.id); });
   map.on('mouseenter', 'access-place-points', () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', 'access-place-points', () => { map.getCanvas().style.cursor = ''; });
   map.on('click', e => {
     if (!state.pickOrigin) return;
-    ORIGIN.longitude = e.lngLat.lng; ORIGIN.latitude = e.lngLat.lat; state.originVersion++; state.boundaryCache.clear(); state.boundaryRouteCache.clear(); state.isochrone = null; state.pickOrigin = false; $('locate-origin').textContent = '⌖  SET ON MAP';
+    ORIGIN.longitude = e.lngLat.lng; ORIGIN.latitude = e.lngLat.lat; state.originVersion++; state.boundaryCache.clear(); state.boundaryRouteCache.clear(); state.isochrone = null; state.expandedReach = null; state.reachBlocksSignature = null; state.pickOrigin = false; $('locate-origin').textContent = '⌖  SET ON MAP';
     render();
     state.places = state.places.map(p => ({ ...p, routeAnalysis: false, routeError: false })); state.routeFailures.clear();
     showToast(state.google ? 'Origin updated. Recalculating walking reach.' : 'Origin moved. Recalculating Lands Department walking routes.');
@@ -716,7 +751,7 @@ async function initGoogle() {
       if (!state.pickOrigin) return;
       const ray = viewer.camera.getPickRay(evt.position); const point = viewer.scene.globe.pick(ray, viewer.scene);
       if (!point) return;
-      const carto = Cesium.Cartographic.fromCartesian(point); ORIGIN.latitude = Cesium.Math.toDegrees(carto.latitude); ORIGIN.longitude = Cesium.Math.toDegrees(carto.longitude); state.originVersion++; state.boundaryCache.clear(); state.boundaryRouteCache.clear(); state.isochrone = null; state.pickOrigin = false; $('locate-origin').textContent = '⌖  SET ON MAP'; state.places = state.places.map(p => ({ ...p, routeAnalysis: false, routeError: false })); state.routeFailures.clear(); showToast('Origin updated. Recalculating walking routes.'); if (state.google) scheduleGoogleAnalysis(); else scheduleLandsDAnalysis();
+      const carto = Cesium.Cartographic.fromCartesian(point); ORIGIN.latitude = Cesium.Math.toDegrees(carto.latitude); ORIGIN.longitude = Cesium.Math.toDegrees(carto.longitude); state.originVersion++; state.boundaryCache.clear(); state.boundaryRouteCache.clear(); state.isochrone = null; state.expandedReach = null; state.reachBlocksSignature = null; state.pickOrigin = false; $('locate-origin').textContent = '⌖  SET ON MAP'; state.places = state.places.map(p => ({ ...p, routeAnalysis: false, routeError: false })); state.routeFailures.clear(); showToast('Origin updated. Recalculating walking routes.'); if (state.google) scheduleGoogleAnalysis(); else scheduleLandsDAnalysis();
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
   } catch (error) {
     console.warn('Detailed 3D tile service unavailable; using interactive 3D building fallback.', error);
@@ -753,7 +788,7 @@ async function runGoogleAnalysis(version) {
       if (!result) return { ...place, routeAnalysis: false, routeError: false, accessible: undefined, path: undefined };
       return { ...place, ...result, routeAnalysis: true, googleAnalysis: true, route_source: 'Google Routes + Elevation API', coordinates: result.path?.length ? [result.path.at(-1)[0], result.path.at(-1)[1]] : place.coordinates };
     });
-    state.isochrone = reach?.feature || null;
+    state.isochrone = reach?.feature || null; state.expandedReach = null; state.reachBlocksSignature = null;
     $('data-status').textContent = 'GOOGLE WALKING REACH · ROUTES + ELEVATION'; render(); syncCesiumReachClip(); fitReachView();
   } catch (error) {
     if (version !== state.googleAnalysisVersion || error.name === 'AbortError') return;

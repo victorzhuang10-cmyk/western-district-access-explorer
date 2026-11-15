@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
   <link href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=block-intersections-02" />
+  <link rel="stylesheet" href="./styles.css?v=snapped-block-buffer-01" />
 </head>
 <body>
   <header class="topbar">
@@ -102,10 +102,10 @@
     </section>
   </main>
 
-  <dialog id="about-dialog"><button class="dialog-close" aria-label="Close">×</button><div class="eyebrow">FIELDNOTES / METHOD</div><h2>Access, measured<br/><em>by the walk.</em></h2><p>The 100 m–2 km slider is a walking-time budget at a 1 m/s reference pace (for example, 300 m = 5 minutes). There is no official buffer polygon in the map data. The app estimates one from 24 Lands Department 3D pedestrian routes toward targets at 15° intervals, cutting each route at its time or grade limit and joining the reached endpoints.</p><p>In 3D Reach’s carved diagram, the broad area fill and contour line are hidden. All visible building footprints are rendered once in one layer: footprints that touch the sampled reach area, including edge buildings, are jade; the rest are white. A touched footprint is only a candidate: this does not confirm that an entrance connects to the reachable path or that the building is publicly accessible. Destination routes are still calculated separately, and the 24-direction boundary remains approximate.</p><a href="https://data.gov.hk/en-data/dataset/hk-lcsd-facility-facility-ofe" target="_blank" rel="noreferrer">Outdoor Fitness Equipment · DATA.GOV.HK ↗</a><a href="https://data.gov.hk/en-data/dataset/hk-landsd-openmap-public-open-space" target="_blank" rel="noreferrer">Public Open Space · Lands Department ↗</a><div class="dialog-credit">3D PEDESTRIAN ROUTES: LAND DEPARTMENT · CSDI<br/>TEXTURED 3D TILES: LANDSD WHEN CONFIGURED · OSM MASSING FALLBACK<br/>SPATIAL PREPARATION: GEOPANDAS · EPSG:2326</div></dialog>
+  <dialog id="about-dialog"><button class="dialog-close" aria-label="Close">×</button><div class="eyebrow">FIELDNOTES / METHOD</div><h2>Access, measured<br/><em>by the walk.</em></h2><p>The 100 m–2 km slider is a walking-time budget at a 1 m/s reference pace (for example, 300 m = 5 minutes). There is no official buffer polygon in the map data. The app estimates one from 24 Lands Department 3D pedestrian routes toward targets at 15° intervals, cutting each route at its time or grade limit and joining the reached endpoints.</p><p>The displayed buffer expands by unioning the whole OpenFreeMap building footprints touched by the sampled boundary. In 2D, its fill sits beneath building footprints; in 3D Reach’s carved diagram, the buffer and edge remain visible and all visible buildings are rendered once, with buildings intersecting reach jade and the rest white. A touched footprint is only a candidate: this does not confirm that an entrance connects to the reachable path or that the building is publicly accessible. Destination routes are still calculated separately, and the 24-direction boundary remains approximate.</p><a href="https://data.gov.hk/en-data/dataset/hk-lcsd-facility-facility-ofe" target="_blank" rel="noreferrer">Outdoor Fitness Equipment · DATA.GOV.HK ↗</a><a href="https://data.gov.hk/en-data/dataset/hk-landsd-openmap-public-open-space" target="_blank" rel="noreferrer">Public Open Space · Lands Department ↗</a><div class="dialog-credit">3D PEDESTRIAN ROUTES: LAND DEPARTMENT · CSDI<br/>TEXTURED 3D TILES: LANDSD WHEN CONFIGURED · OSM MASSING FALLBACK<br/>SPATIAL PREPARATION: GEOPANDAS · EPSG:2326</div></dialog>
 
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Cesium.js"></script>
   <script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.2/dist/maplibre-gl.js'"></script>
-  <script src="./app.js?v=block-intersections-02"></script>
+  <script src="./app.js?v=snapped-block-buffer-01"></script>
 </body>
 </html>
