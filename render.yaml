@@ -3,13 +3,12 @@ services:
     name: western-district-access-explorer
     runtime: python
     plan: free
+    region: singapore
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/config
     envVars:
       - key: GOOGLE_MAPS_API_KEY
-        sync: false
-      - key: LANDSD_3D_MAP_API_KEY
         sync: false
       - key: ORIGIN_LAT
         value: "22.2855625"

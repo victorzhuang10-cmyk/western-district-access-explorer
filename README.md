@@ -28,7 +28,11 @@ GitHub Pages hosts only the static preview; it does not run FastAPI or provide s
 
 ## Deploy the Google-enabled app
 
-The repository includes `render.yaml` for a same-origin FastAPI deployment. In Render, create a Blueprint from this public repository. Render will prompt for `GOOGLE_MAPS_API_KEY`; add the key there and keep it out of GitHub. Enable the Maps Tiles, Routes, and Elevation APIs in the matching Google Cloud project. The resulting `onrender.com` URL serves the interactive site and its `/api` endpoints together. The GitHub Pages URL remains the no-key Lands Department preview.
+The repository includes `render.yaml` for a same-origin FastAPI deployment. Use this button to create the free Render service from the public repository:
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/victorzhuang10-cmyk/western-district-access-explorer)
+
+Render will prompt for `GOOGLE_MAPS_API_KEY`; enter it in Render and keep it out of GitHub. Enable the Maps Tiles, Routes, and Elevation APIs in the matching Google Cloud project. The resulting `onrender.com` URL serves the interactive site and its `/api` endpoints together. GitHub Pages remains the no-key Lands Department preview. To enable the optional official Lands Department detailed 3D tiles, add `LANDSD_3D_MAP_API_KEY` to the Render service environment separately.
 
 ## Data workflow
 
