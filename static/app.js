@@ -148,7 +148,7 @@ function applyPresentation() {
         map.setPaintProperty(layer.id, 'fill-extrusion-opacity', style === 'diagram' ? .96 : .72);
       } else if (layer.id === 'reach-mask-fill') {
         map.setLayoutProperty(layer.id, 'visibility', view === 'reach' ? 'visible' : 'none');
-        map.setPaintProperty(layer.id, 'fill-opacity', style === 'diagram' ? .98 : .92);
+        map.setPaintProperty(layer.id, 'fill-opacity', style === 'diagram' ? .76 : .58);
       } else if (layer.id.startsWith('walk-buffer-')) {
         map.setLayoutProperty(layer.id, 'visibility', view === 'reach' || view === 'map' ? 'visible' : 'none');
       } else if (!['accessible-route-casing','accessible-routes','access-place-points','access-place-labels','origin-point','origin-label'].includes(layer.id)) {
@@ -159,7 +159,7 @@ function applyPresentation() {
         if (layer.type === 'line' && layer.paint?.['line-color']) map.setPaintProperty(layer.id, 'line-color', style === 'diagram' ? '#c5c9bf' : '#aeb5ac');
       }
     }
-    map.flyTo({ center: [ORIGIN.longitude, ORIGIN.latitude], zoom: threeD ? 16.3 : 15.6, pitch: threeD ? 48 : 0, bearing: threeD && style === 'detailed' ? -12 : 0, duration: 550 });
+    map.flyTo({ center: [ORIGIN.longitude, ORIGIN.latitude], zoom: view === 'reach' ? 17.1 : threeD ? 16.7 : 15.6, pitch: threeD ? 48 : 0, bearing: threeD && style === 'detailed' ? -12 : 0, duration: 550 });
     requestAnimationFrame(() => map.resize());
   }
   if (state.map) {
@@ -405,7 +405,7 @@ function addMapLibreLayers(map) {
 }
 function initMapLibre() {
   if (!window.maplibregl) { $('map-loading').textContent = 'Map library unavailable · check your connection and reload'; $('map-loading').classList.add('map-loading-error'); showToast('The map library did not load. Check the connection and refresh.'); return; }
-  const map = new maplibregl.Map({ container: 'maplibre-container', style: 'https://tiles.openfreemap.org/styles/liberty', center: [MAP_CENTER.longitude, MAP_CENTER.latitude], zoom: 15.6, pitch: 0, bearing: 0, maxPitch: 65, attributionControl: true, antialias: true, cooperativeGestures: true });
+  const map = new maplibregl.Map({ container: 'maplibre-container', style: 'https://tiles.openfreemap.org/styles/liberty', center: [MAP_CENTER.longitude, MAP_CENTER.latitude], zoom: 16.7, pitch: 48, bearing: -12, maxPitch: 65, attributionControl: true, antialias: true, cooperativeGestures: true });
   state.maplibre = map;
   const mapLoadTimer = setTimeout(() => { if (!$('map-loading').hidden) $('map-loading').textContent = 'Map tiles are taking longer than usual · keep this page open while they load'; }, 12000);
   map.addControl(new maplibregl.NavigationControl({ showCompass: false, showZoom: false }), 'top-right');
@@ -498,5 +498,5 @@ document.querySelector('.dialog-close').addEventListener('click', () => $('about
 $('locate-origin').addEventListener('click', () => { if (!state.map && !state.maplibre) return showToast('The map is still loading.'); state.pickOrigin = true; $('locate-origin').textContent = 'CLICK MAP TO SET'; showToast('Click the map to move the origin.'); });
 $('zoom-in').addEventListener('click', () => { if (state.view !== 'map' && state.map) state.map.camera.zoomIn(250); else if (state.maplibre) state.maplibre.zoomIn({ duration: 250 }); });
 $('zoom-out').addEventListener('click', () => { if (state.view !== 'map' && state.map) state.map.camera.zoomOut(250); else if (state.maplibre) state.maplibre.zoomOut({ duration: 250 }); });
-$('reset-view').addEventListener('click', () => { if (state.view !== 'map' && state.map) setView(state.view); else if (state.maplibre) state.maplibre.flyTo({ center: [ORIGIN.longitude, ORIGIN.latitude], zoom: 15.6, pitch: state.view === 'map' ? 0 : 48, bearing: state.view === 'map' ? 0 : -12, duration: 700 }); });
+$('reset-view').addEventListener('click', () => { if (state.view !== 'map' && state.map) setView(state.view); else if (state.maplibre) state.maplibre.flyTo({ center: [ORIGIN.longitude, ORIGIN.latitude], zoom: state.view === 'reach' ? 17.1 : state.view === 'map' ? 15.6 : 16.7, pitch: state.view === 'map' ? 0 : 48, bearing: state.view === 'map' ? 0 : -12, duration: 700 }); });
 setRange(); loadAccessPoints().then(initGoogle);
