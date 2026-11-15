@@ -3,7 +3,7 @@ const MAP_CENTER = { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude };
 const $ = (id) => document.getElementById(id);
 const apiUrl = (path) => new URL(`${location.pathname.includes('/static/') ? '../' : './'}api/${path}`, document.baseURI).toString();
 const staticUrl = (path) => new URL(`./${path}`, document.baseURI).toString();
-const state = { distanceMetres: 300, walkTimeSeconds: 300, slope: 15, filter: 'all', view: 'reach', mapStyle: 'detailed', massingStyle: 'detailed', reachStyle: 'detailed', places: [], google: false, isochrone: null, boundarySamples: 0, sectionPlaceId: null, map: null, maplibre: null, tileset: null, clippingSignature: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, googleAnalysisVersion: 0, googleController: null, routeFailures: new Set(), boundaryCache: new Map() };
+const state = { distanceMetres: 300, walkTimeSeconds: 300, slope: 15, filter: 'all', view: 'reach', mapStyle: 'detailed', massingStyle: 'detailed', reachStyle: 'detailed', places: [], google: false, isochrone: null, boundarySamples: 0, sectionPlaceId: null, map: null, maplibre: null, tileset: null, clippingSignature: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, googleAnalysisVersion: 0, googleController: null, routeFailures: new Set(), boundaryCache: new Map(), boundaryRouteCache: new Map() };
 
 function formatDistance(m) { return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`; }
 function durationMinutes(p) { return p.duration_s != null ? p.duration_s / 60 : null; }
@@ -24,7 +24,7 @@ function updateSliderPaint(input) {
 function candidateDistanceLimit() { return Math.min(4000, state.distanceMetres * 2); }
 function candidatePlaces() { const limit = candidateDistanceLimit(); return state.places.filter(p => Number(p.study_distance_m) <= limit); }
 function setRange(analyze = true) {
-  state.distanceMetres = Number($('distance').value); state.walkTimeSeconds = state.distanceMetres; state.slope = Number($('slope').value); state.isochrone = null;
+  state.distanceMetres = Number($('distance').value); state.walkTimeSeconds = state.distanceMetres; state.slope = Number($('slope').value);
   $('distance-value').textContent = state.distanceMetres; $('slope-value').textContent = state.slope;
   $('walk-time').textContent = `${(state.walkTimeSeconds / 60).toFixed(state.walkTimeSeconds % 60 ? 1 : 0)} min`;
   $('caption-distance').textContent = Math.round(state.walkTimeSeconds / 60);
@@ -375,18 +375,29 @@ async function buildLandsDContour(origin, originVersion) {
   const distanceMetres = state.distanceMetres, maxSlope = state.slope;
   const walkTimeSeconds = state.walkTimeSeconds;
   const cacheKey = `${originVersion}/${walkTimeSeconds}/${maxSlope}`;
-  if (state.boundaryCache.has(cacheKey)) { state.isochrone = state.boundaryCache.get(cacheKey); render(); fitReachView(); return; }
+  if (state.boundaryCache.has(cacheKey)) {
+    state.isochrone = state.boundaryCache.get(cacheKey);
+    state.boundarySamples = state.isochrone?.properties?.sample_count || 0;
+    $('data-status').textContent = state.isochrone ? `LANDS DEPARTMENT 3D ROUTES · ${state.boundarySamples}/24 SLOPE-SAFE DIRECTIONS` : 'LANDS DEPARTMENT 3D ROUTES · NO REACH CONTOUR';
+    render(); fitReachView(); return;
+  }
   const boundary = [], sampleCount = 24, bearingStep = 360 / sampleCount;
   let nextSpoke = 0, completedSpokes = 0;
   const sampleWorker = async () => {
     while (true) {
       const spoke = nextSpoke++;
-      if (spoke >= sampleCount || originVersion !== state.originVersion) return;
+      if (spoke >= sampleCount || originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope) return;
       $('data-status').textContent = `TRACING WALK REACH · ${completedSpokes}/${sampleCount} DIRECTIONS`;
-      const coordinates = radialDestination(origin, Math.min(4000, distanceMetres * 1.6), spoke * bearingStep);
-      const target = { id: `buffer-${spoke}`, name: 'Walking-time boundary sample', coordinates };
+      const routeKey = `${originVersion}/${spoke}`;
       try {
-        const route = await landsDRoute(target, origin);
+        let route = state.boundaryRouteCache.get(routeKey);
+        const requestRoute = route === undefined;
+        if (requestRoute) {
+          const coordinates = radialDestination(origin, 3200, spoke * bearingStep);
+          route = await landsDRoute({ id: `buffer-${spoke}`, name: 'Walking-time boundary sample', coordinates }, origin);
+          state.boundaryRouteCache.set(routeKey, route);
+        }
+        if (originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope) return;
         if (route.route_exists && route.path?.length) {
           const endpoint = accessiblePrefixEndpoint(route.path, distanceMetres * 1.6, maxSlope, route.duration_s, walkTimeSeconds);
           if (endpoint) boundary.push({ bearing: spoke * bearingStep, coordinate: endpoint, originElevation: Number(route.path[0][2]) });
@@ -394,7 +405,7 @@ async function buildLandsDContour(origin, originVersion) {
       } catch (error) { console.warn(`Walking-time boundary sample ${spoke + 1} unavailable.`, error); }
       completedSpokes += 1;
       $('data-status').textContent = `TRACING WALK REACH · ${completedSpokes}/${sampleCount} DIRECTIONS`;
-      if (spoke + 1 < sampleCount) await wait(250);
+      if (requestRoute && spoke + 1 < sampleCount) await wait(250);
     }
   };
   await Promise.all(Array.from({ length: Math.min(4, sampleCount) }, sampleWorker));
@@ -417,7 +428,10 @@ async function runLandsDAnalysis() {
   if (state.routeQueueRunning) { state.routeQueueRequested = true; return; }
   state.routeQueueRunning = true;
   const originVersion = state.originVersion, origin = { ...ORIGIN };
+  const distanceAtStart = state.distanceMetres, slopeAtStart = state.slope;
   try {
+    await buildLandsDContour(origin, originVersion);
+    if (state.google || originVersion !== state.originVersion || distanceAtStart !== state.distanceMetres || slopeAtStart !== state.slope) return;
     const maxSeedDistance = Math.min(4000, state.distanceMetres * 2);
     const todo = state.places.filter(p => !p.routeAnalysis && !state.routeFailures.has(p.id) && p.study_distance_m <= maxSeedDistance);
     for (let i = 0; i < todo.length; i += 1) {
@@ -434,7 +448,6 @@ async function runLandsDAnalysis() {
       render();
       if (i + 1 < todo.length) await wait(500);
     }
-    if (!state.google && originVersion === state.originVersion) await buildLandsDContour(origin, originVersion);
   } finally {
     state.routeQueueRunning = false;
     if (state.routeQueueRequested) { state.routeQueueRequested = false; if (!state.google) scheduleLandsDAnalysis(); }
@@ -483,8 +496,8 @@ function addMapLibreLayers(map) {
   map.on('mouseleave', 'access-place-points', () => { map.getCanvas().style.cursor = ''; });
   map.on('click', e => {
     if (!state.pickOrigin) return;
-    ORIGIN.longitude = e.lngLat.lng; ORIGIN.latitude = e.lngLat.lat; state.originVersion++; state.pickOrigin = false; $('locate-origin').textContent = '⌖  SET ON MAP';
-    state.isochrone = null; render();
+    ORIGIN.longitude = e.lngLat.lng; ORIGIN.latitude = e.lngLat.lat; state.originVersion++; state.boundaryCache.clear(); state.boundaryRouteCache.clear(); state.isochrone = null; state.pickOrigin = false; $('locate-origin').textContent = '⌖  SET ON MAP';
+    render();
     state.places = state.places.map(p => ({ ...p, routeAnalysis: false, routeError: false })); state.routeFailures.clear();
     showToast(state.google ? 'Origin updated. Recalculating walking reach.' : 'Origin moved. Recalculating Lands Department walking routes.');
     if (state.google) scheduleGoogleAnalysis(); else scheduleLandsDAnalysis();
@@ -534,7 +547,7 @@ async function initGoogle() {
       if (!state.pickOrigin) return;
       const ray = viewer.camera.getPickRay(evt.position); const point = viewer.scene.globe.pick(ray, viewer.scene);
       if (!point) return;
-      const carto = Cesium.Cartographic.fromCartesian(point); ORIGIN.latitude = Cesium.Math.toDegrees(carto.latitude); ORIGIN.longitude = Cesium.Math.toDegrees(carto.longitude); state.originVersion++; state.pickOrigin = false; $('locate-origin').textContent = '⌖  SET ON MAP'; state.places = state.places.map(p => ({ ...p, routeAnalysis: false, routeError: false })); state.routeFailures.clear(); showToast('Origin updated. Recalculating walking routes.'); if (state.google) scheduleGoogleAnalysis(); else scheduleLandsDAnalysis();
+      const carto = Cesium.Cartographic.fromCartesian(point); ORIGIN.latitude = Cesium.Math.toDegrees(carto.latitude); ORIGIN.longitude = Cesium.Math.toDegrees(carto.longitude); state.originVersion++; state.boundaryCache.clear(); state.boundaryRouteCache.clear(); state.isochrone = null; state.pickOrigin = false; $('locate-origin').textContent = '⌖  SET ON MAP'; state.places = state.places.map(p => ({ ...p, routeAnalysis: false, routeError: false })); state.routeFailures.clear(); showToast('Origin updated. Recalculating walking routes.'); if (state.google) scheduleGoogleAnalysis(); else scheduleLandsDAnalysis();
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
   } catch (error) {
     console.warn('Detailed 3D tile service unavailable; using interactive 3D building fallback.', error);
