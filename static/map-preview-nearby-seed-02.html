@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
   <link href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=route-corridors-01" />
+  <link rel="stylesheet" href="./styles.css?v=route-corridors-02" />
 </head>
 <body>
   <header class="topbar">
@@ -102,10 +102,10 @@
     </section>
   </main>
 
-  <dialog id="about-dialog"><button class="dialog-close" aria-label="Close">×</button><div class="eyebrow">FIELDNOTES / METHOD</div><h2>Access, measured<br/><em>by the walk.</em></h2><p>The 100 m–2 km slider is a walking-time budget at a 1 m/s reference pace (for example, 300 m = 5 minutes). The filled buffer follows sampled pedestrian-network routes and adds a 6 m corridor around each accepted destination route; it is not a circle. Route acceptance uses both the overall start-to-end grade and the steepest grade between consecutive 3D elevation samples.</p><p>The public preview uses the Lands Department 3D Pedestrian Route service and does not require Google Maps billing. Its main area is estimated from 24 route directions; unsampled or blocked directions remain gaps. The 6 m corridors only represent access to accepted destinations, not every walkable path. Open-space records are points rather than park parcel boundaries, so the shaded area clips locations, not whole parks. Steps, kerbs, surfaces, crossing safety, step-free entrances, equipment condition, and opening hours need field checks.</p><a href="https://data.gov.hk/en-data/dataset/hk-lcsd-facility-facility-ofe" target="_blank" rel="noreferrer">Outdoor Fitness Equipment · DATA.GOV.HK ↗</a><a href="https://data.gov.hk/en-data/dataset/hk-landsd-openmap-public-open-space" target="_blank" rel="noreferrer">Public Open Space · Lands Department ↗</a><div class="dialog-credit">3D PEDESTRIAN ROUTES: LAND DEPARTMENT · CSDI<br/>TEXTURED 3D TILES: LANDSD WHEN CONFIGURED · OSM MASSING FALLBACK<br/>SPATIAL PREPARATION: GEOPANDAS · EPSG:2326</div></dialog>
+  <dialog id="about-dialog"><button class="dialog-close" aria-label="Close">×</button><div class="eyebrow">FIELDNOTES / METHOD</div><h2>Access, measured<br/><em>by the walk.</em></h2><p>The 100 m–2 km slider is a walking-time budget at a 1 m/s reference pace (for example, 300 m = 5 minutes). The filled buffer follows sampled pedestrian-network routes and adds a 6 m buffer on either side of each accepted destination route; it is not a circle. Route acceptance uses both the overall start-to-end grade and the steepest grade between consecutive 3D elevation samples.</p><p>The public preview uses the Lands Department 3D Pedestrian Route service and does not require Google Maps billing. Its main area is estimated from 24 route directions; unsampled or blocked directions remain gaps. These route buffers only represent access to accepted destinations, not every walkable path. Open-space records are points rather than park parcel boundaries, so the shaded area clips locations, not whole parks. Steps, kerbs, surfaces, crossing safety, step-free entrances, equipment condition, and opening hours need field checks.</p><a href="https://data.gov.hk/en-data/dataset/hk-lcsd-facility-facility-ofe" target="_blank" rel="noreferrer">Outdoor Fitness Equipment · DATA.GOV.HK ↗</a><a href="https://data.gov.hk/en-data/dataset/hk-landsd-openmap-public-open-space" target="_blank" rel="noreferrer">Public Open Space · Lands Department ↗</a><div class="dialog-credit">3D PEDESTRIAN ROUTES: LAND DEPARTMENT · CSDI<br/>TEXTURED 3D TILES: LANDSD WHEN CONFIGURED · OSM MASSING FALLBACK<br/>SPATIAL PREPARATION: GEOPANDAS · EPSG:2326</div></dialog>
 
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Cesium.js"></script>
   <script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.2/dist/maplibre-gl.js'"></script>
-  <script src="./app.js?v=route-corridors-01"></script>
+  <script src="./app.js?v=route-corridors-02"></script>
 </body>
 </html>

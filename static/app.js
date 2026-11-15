@@ -358,7 +358,7 @@ function renderMapLibreOverlays() {
   if (map.getLayer('reach-mask-fill') && map.getLayer('3d-buildings-context')) map.moveLayer('reach-mask-fill', '3d-buildings-context');
   const boundaryText = $('reach-boundary-status');
   if (boundaryText) boundaryText.textContent = state.isochrone
-    ? `${state.isochrone.properties.sample_count}/${state.isochrone.properties.requested_samples} sampled directions pass the ${Math.round(state.walkTimeSeconds / 60)} min walk-time and grade limits. Accepted destinations add a 6 m reach corridor along each accessible route.`
+    ? `${state.isochrone.properties.sample_count}/${state.isochrone.properties.requested_samples} sampled directions pass the ${Math.round(state.walkTimeSeconds / 60)} min walk-time and grade limits. Accepted destinations add a 6 m buffer on either side of each accessible route.`
     : 'Waiting for walking-route samples';
   renderMapLibreSvgRoutes();
 }
