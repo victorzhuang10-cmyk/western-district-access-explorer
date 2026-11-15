@@ -389,9 +389,10 @@ async function buildLandsDContour(origin, originVersion) {
       if (spoke >= sampleCount || originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope) return;
       $('data-status').textContent = `TRACING WALK REACH · ${completedSpokes}/${sampleCount} DIRECTIONS`;
       const routeKey = `${originVersion}/${spoke}`;
+      let requestRoute = false;
       try {
         let route = state.boundaryRouteCache.get(routeKey);
-        const requestRoute = route === undefined;
+        requestRoute = route === undefined;
         if (requestRoute) {
           const coordinates = radialDestination(origin, 3200, spoke * bearingStep);
           route = await landsDRoute({ id: `buffer-${spoke}`, name: 'Walking-time boundary sample', coordinates }, origin);
