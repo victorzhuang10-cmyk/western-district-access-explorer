@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#f4f3ee" />
+  <script>if (location.protocol === 'file:') location.replace('https://victorzhuang10-cmyk.github.io/western-district-access-explorer/map.html');</script>
+  <title>Western District · Age-friendly access explorer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
+  <link href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css?v=reach-cut-20" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="Western District access explorer home">
+      <span class="brand-mark"><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M4 20.8 12.1 5l4.2 8.2L19 8l5 12.8H4Z"/><path d="M9.4 20.7 13 13.8m7.1 6.9-2.7-6"/></svg></span>
+      <span><strong>FIELDNOTES</strong><small>WESTERN DISTRICT · HONG KONG</small></span>
+    </a>
+  <div class="top-center"><span class="live-dot"></span><span id="data-status">LOADING HONG KONG PUBLIC DATA</span></div>
+    <div class="top-right"><button class="icon-btn" id="about-btn" aria-label="About this map" title="About this map">i</button><span class="top-divider"></span><span class="edition">RESEARCH EDITION <b>01</b></span></div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <div class="intro">
+        <div class="eyebrow"><span>AGE-FRIENDLY ACCESS</span><span class="eyebrow-line"></span><span>01 / 03</span></div>
+        <h1>Everyday<br/><em>within reach.</em></h1>
+        <p class="intro-copy">A walking access study around Western District Elderly Community Centre. Find the green and active places older neighbours can reach comfortably.</p>
+      </div>
+
+      <section class="origin-card">
+        <div class="section-kicker"><span class="step-no">01</span><span>STARTING POINT</span><button class="edit-origin" id="locate-origin">⌖ &nbsp; SET ON MAP</button></div>
+        <div class="origin-row"><span class="origin-pin"><i></i></span><div><strong>Western District Elderly</strong><small>Hill Court · 28 Hill Road, Sai Ying Pun</small></div><button class="chevron" aria-label="Origin details">↗</button></div>
+        <div class="origin-note"><span>●</span> Approximate location · confirm entrance</div>
+      </section>
+
+      <section class="controls-section">
+        <div class="section-kicker"><span class="step-no">02</span><span>WALK-TIME REACH</span><span class="kicker-info" title="Places are included by routed walking time and the slope limit. The slider value is an equivalent walking distance at 1 m/s.">?</span></div>
+        <div class="range-title"><div><strong>Walking-time budget</strong><small>Google Maps route time when configured</small></div><div class="range-value"><b id="distance-value">300</b><span>m*</span></div></div>
+        <input id="distance" class="range range-distance" type="range" min="100" max="2000" step="50" value="300" aria-label="Walking-time budget, shown as equivalent metres at one metre per second" />
+        <div class="range-scale"><span>100 m</span><span>2 km</span></div>
+        <div class="time-chip"><span class="clock-icon">◷</span><span><b id="walk-time">5 min</b> routed-time limit</span></div>
+
+        <div class="slope-block">
+          <div class="range-title"><div><strong>Maximum route slope</strong><small>Steepest sampled segment</small></div><div class="range-value slope-value"><b id="slope-value">10</b><span>°</span></div></div>
+          <input id="slope" class="range range-slope" type="range" min="3" max="20" step="1" value="15" aria-label="Maximum allowed slope in degrees" />
+          <div class="range-scale"><span>Gentler · 3°</span><span>Steeper · 20°</span></div>
+          <div class="slope-legend"><span><i class="legend-dot accessible"></i>Within limit</span><span><i class="legend-dot steep"></i>Too steep</span></div>
+        </div>
+      </section>
+
+      <section class="places-section">
+        <div class="section-kicker"><span class="step-no">03</span><span>PLACES TO EXPLORE</span><span class="place-total" id="place-total">00</span></div>
+        <div class="place-filters"><button class="filter active" data-filter="all"><span>All places</span><span id="all-count">00</span></button><button class="filter" data-filter="green"><span><i class="filter-dot green"></i>Green space</span><span id="green-count">00</span></button><button class="filter" data-filter="gym"><span><i class="filter-dot gym"></i>Outdoor fitness</span><span id="gym-count">00</span></button></div>
+        <div class="place-list" id="place-list"></div>
+      </section>
+
+      <footer class="sidebar-footer"><span class="north">N</span><span>WESTERN DISTRICT<br/>22°17′N &nbsp; 114°08′E</span><button id="source-btn">DATA & METHOD ↗</button></footer>
+    </aside>
+
+    <section class="map-shell" aria-label="Interactive 3D accessibility map">
+      <div id="cesium-container" class="map-canvas"></div>
+      <div id="maplibre-container" class="map-canvas" aria-label="Interactive 3D map with OpenStreetMap buildings"></div>
+      <div id="map-loading" class="map-loading" role="status" aria-live="polite"><span class="loading-spinner" aria-hidden="true"></span><span>Loading Hong Kong streets and 3D buildings…</span><small>Map tiles usually appear after a few seconds</small></div>
+      <svg id="map-route-overlay" class="map-route-overlay" aria-hidden="true"></svg>
+      <div class="map-topline"><div class="map-context"><span class="context-mark">⌖</span><span><b>SAI YING PUN</b><small>WESTERN DISTRICT, HONG KONG</small></span></div><div class="map-live"><i></i> <span id="map-data-label">3D DETAILED MASSING · ACCESS ROUTES</span></div></div>
+      <div class="map-controls"><button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button><button id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button><span></span><button id="reset-view" title="Reset view" aria-label="Reset view">⌖</button></div>
+
+      <div class="map-caption"><span class="caption-mark">3D</span><span><b>WALK-TIME REACH</b><small>ROUTED TIME · PATHS · SLOPE</small></span><span class="caption-rule"></span><span class="caption-radius"><b id="caption-distance">5</b> MIN</span></div>
+
+      <div id="section-panel" class="section-panel" aria-label="3D elevation section" hidden></div>
+      <div class="view-switcher" aria-label="Map presentation">
+        <div class="switch-copy"><span>MAP PRESENTATION</span><small id="presentation-title">3D massing · detailed</small></div>
+        <div class="presentation-tabs" role="group" aria-label="Choose map type">
+          <button class="view-option" data-view="map" aria-pressed="false"><b>2D MAP</b></button>
+          <button class="view-option selected" data-view="massing" aria-pressed="true"><b>3D MASSING</b></button>
+          <button class="view-option" data-view="reach" aria-pressed="false"><b>3D REACH</b></button>
+        </div>
+        <div class="style-tabs" role="group" aria-label="Map detail style"><button class="style-option selected" data-style="detailed" aria-pressed="true">Detailed</button><button class="style-option" data-style="diagram" aria-pressed="false">Diagram</button></div>
+        <button class="profile-option" data-view="section">Open route elevation profile ↗</button>
+      </div>
+      <div class="north-arrow">N <span>↑</span></div>
+      <a class="landsd-mark" href="https://www.landsd.gov.hk/" target="_blank" rel="noreferrer" aria-label="Lands Department, Government of Hong Kong"><span>地政總署</span><b>LANDS DEPARTMENT</b></a>
+      <div class="map-attribution" id="map-attribution">OPENFREEMAP · © OPENSTREETMAP CONTRIBUTORS</div>
+      <div class="google-credits" id="google-credits" aria-label="Google Maps and map data attribution"><span class="google-maps-brand" aria-label="Google Maps">Google Maps</span></div>
+      <div class="map-zoom-hint">DRAG TO ORBIT <span>·</span> SCROLL TO ZOOM</div>
+      <div class="toast" id="toast" role="status"></div>
+    </section>
+  </main>
+
+  <dialog id="about-dialog"><button class="dialog-close" aria-label="Close">×</button><div class="eyebrow">FIELDNOTES / METHOD</div><h2>Access, measured<br/><em>by the walk.</em></h2><p>The 100 m–2 km slider sets a walking-time budget using a 1 m/s reference pace (for example, 300 m = 5 minutes). Places and the mapped reach are included by route travel time, then screened by the steepest sampled route slope. Google Maps Routes time is used when its backend is configured; the public static preview uses Lands Department 3D Pedestrian Route times.</p><p>The shaded reach is a sampled contour, not a complete isochrone. Google walking routes can omit clear sidewalks or pedestrian paths; neither route source verifies steps, kerbs, surface quality, crossing safety, step-free access, equipment condition, or opening hours. Public open-space records are points, not green parcel boundaries. Field checks are needed before product decisions.</p><a href="https://data.gov.hk/en-data/dataset/hk-lcsd-facility-facility-ofe" target="_blank" rel="noreferrer">Outdoor Fitness Equipment · DATA.GOV.HK ↗</a><a href="https://data.gov.hk/en-data/dataset/hk-landsd-openmap-public-open-space" target="_blank" rel="noreferrer">Public Open Space · Lands Department ↗</a><div class="dialog-credit">3D PEDESTRIAN NETWORK: LAND DEPARTMENT · CSDI<br/>3D BASEMAP: LANDSD 3D TILES WHEN CONFIGURED · OSM MASSING FALLBACK<br/>SPATIAL PREPARATION: GEOPANDAS · EPSG:2326</div></dialog>
+
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Cesium.js"></script>
+  <script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.2/dist/maplibre-gl.js'"></script>
+  <script src="./app.js?v=reach-cut-20"></script>
+</body>
+</html>
