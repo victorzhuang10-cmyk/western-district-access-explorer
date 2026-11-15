@@ -195,13 +195,16 @@ async def analyze(request: AnalyzeRequest):
 
 
 def walking_candidates(origin: dict[str, float], distance_m: int, spokes: int = 24) -> list[dict]:
-    """Create radial candidates for a route-time boundary, sized from the 1 m/s distance equivalent."""
+    """Create Google-routed candidates that bracket the selected walking-time boundary."""
     points = []
-    fractions = (0.35, 0.55, 0.75, 0.95, 1.15)
+    # Direct distance only seeds the matrix query; Google returns the actual
+    # pedestrian duration for every candidate. The wide spacing makes it more
+    # likely to bracket that duration even where the street network detours.
+    fractions = (0.5, 0.8, 1.1, 1.5, 2.0)
     for spoke in range(spokes):
         bearing = 2 * math.pi * spoke / spokes
         for ring, fraction in enumerate(fractions):
-            distance = min(4000, distance_m * fraction)
+            distance = min(7000, distance_m * fraction)
             north_m, east_m = distance * math.cos(bearing), distance * math.sin(bearing)
             latitude = origin["latitude"] + north_m / 111_320
             longitude = origin["longitude"] + east_m / (111_320 * math.cos(math.radians(origin["latitude"])))
@@ -252,12 +255,33 @@ async def isochrone(request: AnalyzeRequest):
 
         by_spoke: dict[int, list[dict]] = {i: [] for i in range(24)}
         for item in candidates:
-            if item.get("route_exists") and item.get("duration_s", 0) <= request.walk_time_seconds:
+            if item.get("route_exists"):
                 by_spoke[item["spoke"]].append(item)
 
         semaphore = asyncio.Semaphore(6)
         async def find_spoke_edge(spoke: int):
-            for candidate in sorted(by_spoke[spoke], key=lambda p: p["ring"], reverse=True):
+            spoke_candidates = by_spoke[spoke]
+            inside = [p for p in spoke_candidates if p.get("duration_s", 0) <= request.walk_time_seconds]
+            outside = [p for p in spoke_candidates if p.get("duration_s", 0) > request.walk_time_seconds]
+            attempts = []
+            if inside and outside:
+                inner = max(inside, key=lambda p: p["distance_m"])
+                outer = min((p for p in outside if p["distance_m"] > inner["distance_m"]), key=lambda p: p["distance_m"], default=None)
+                if outer and outer["duration_s"] > inner["duration_s"]:
+                    fraction = (request.walk_time_seconds - inner["duration_s"]) / (outer["duration_s"] - inner["duration_s"])
+                    fraction = max(0.0, min(1.0, fraction))
+                    attempts.append({
+                        "spoke": spoke,
+                        "ring": "interpolated",
+                        "distance_m": inner["distance_m"] + fraction * (outer["distance_m"] - inner["distance_m"]),
+                        "latitude": inner["latitude"] + fraction * (outer["latitude"] - inner["latitude"]),
+                        "longitude": inner["longitude"] + fraction * (outer["longitude"] - inner["longitude"]),
+                    })
+            # Re-route the interpolated point through Routes API to verify the
+            # time estimate; if it crosses the threshold or fails the grade
+            # screen, fall back to progressively shorter matrix candidates.
+            attempts.extend(sorted(inside, key=lambda p: p["distance_m"], reverse=True))
+            for candidate in attempts:
                 async with semaphore:
                     dest = Destination(id=f"iso-{spoke}-{candidate['ring']}", name="Walking reach sample", latitude=candidate["latitude"], longitude=candidate["longitude"])
                     try:
@@ -274,7 +298,7 @@ async def isochrone(request: AnalyzeRequest):
         return {"feature": None, "boundary_samples": len(boundary), "requested_samples": 24, "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg, "message": "Too few slope-safe walking directions were found to draw a reliable contour."}
     coordinates = [[point["longitude"], point["latitude"]] for point in sorted(boundary, key=lambda p: p["spoke"])]
     coordinates.append(coordinates[0])
-    feature = {"type": "Feature", "properties": {"method": "Google Routes walking matrix + slope-screened route/elevation spokes", "sample_count": len(boundary), "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg}, "geometry": {"type": "Polygon", "coordinates": [coordinates]}}
+    feature = {"type": "Feature", "properties": {"method": "Google Routes walking-time matrix with interpolated and verified boundary routes; elevation-screened spokes", "sample_count": len(boundary), "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg}, "geometry": {"type": "Polygon", "coordinates": [coordinates]}}
     return {"feature": feature, "boundary_samples": len(boundary), "requested_samples": 24, "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg}
 
 
