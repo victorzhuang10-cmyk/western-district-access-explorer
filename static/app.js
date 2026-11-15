@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 12036)
+Total output lines: 534
+
 const ORIGIN = { latitude: 22.2855625, longitude: 114.1347709 };
 const MAP_CENTER = { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude };
 const $ = (id) => document.getElementById(id);
@@ -178,12 +181,22 @@ function renderCesiumOverlays() {
   if (!state.map) return;
   for (const entity of [...state.routeEntities, ...state.markerEntities]) state.map.entities.remove(entity);
   state.routeEntities = []; state.markerEntities = [];
-  const origin = state.map.entities.add({ position: Cesium.Cartesian3.fromDegrees(ORIGIN.longitude, ORIGIN.latitude, 20), point: { pixelSize: 12, color: Cesium.Color.fromCssColorString('#cb5237'), outlineColor: Cesium.Color.WHITE, outlineWidth: 3, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND }, label: { text: 'COMMUNITY CENTRE', font: '12px DM Sans', pixelOffset: new Cesium.Cartesian2(16, -12), fillColor: Cesium.Color.fromCssColorString('#9e4535'), outlineColor: Cesium.Color.WHITE, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND } });
+  const originRoute = state.places.find(p => p.path?.length && Number.isFinite(Number(p.path[0][2])))?.path;
+  const originHeight = originRoute ? Number(originRoute[0][2]) : 20;
+  const originHeightReference = originRoute ? Cesium.HeightReference.NONE : Cesium.HeightReference.CLAMP_TO_GROUND;
+  const origin = state.map.entities.add({ position: Cesium.Cartesian3.fromDegrees(ORIGIN.longitude, ORIGIN.latitude, originHeight), point: { pixelSize: 12, color: Cesium.Color.fromCssColorString('#cb5237'), outlineColor: Cesium.Color.WHITE, outlineWidth: 3, heightReference: originHeightReference }, label: { text: 'COMMUNITY CENTRE', font: '12px DM Sans', pixelOffset: new Cesium.Cartesian2(16, -12), fillColor: Cesium.Color.fromCssColorString('#9e4535'), outlineColor: Cesium.Color.WHITE, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, heightReference: originHeightReference } });
   state.markerEntities.push(origin);
   const ring = (state.view === 'reach' || state.view === 'map') ? state.isochrone?.geometry : null;
   if (ring?.type === 'Polygon') {
-    const contour = ring.coordinates[0].flatMap(c => c.slice(0, 2));
-    state.routeEntities.push(state.map.entities.add({ polygon: { hierarchy: Cesium.Cartesian3.fromDegreesArray(contour), material: Cesium.Color.fromCssColorString('#cb5237').withAlpha(.18), outline: true, outlineColor: Cesium.Color.fromCssColorString('#cb5237').withAlpha(.9), outlineWidth: 2, height: 8 } }));
+    const coordinates = ring.coordinates[0];
+    const hasElevation = coordinates.every(c => c.length > 2 && Number.isFinite(Number(c[2])));
+    const hierarchy = hasElevation
+      ? Cesium.Cartesian3.fromDegreesArrayHeights(coordinates.flatMap(c => [c[0], c[1], Number(c[2])]))
+      : Cesium.Cartesian3.fromDegreesArray(coordinates.flatMap(c => c.slice(0, 2)));
+    const polygon = { hierarchy, material: Cesium.Color.fromCssColorString('#cb5237').withAlpha(.18), outline: true, outlineColor: Cesium.Color.fromCssColorString('#cb5237').withAlpha(.9), outlineWidth: 2 };
+    if (hasElevation) polygon.perPositionHeight = true;
+    else polygon.height = 8;
+    state.routeEntities.push(state.map.entities.add({ polygon }));
   }
   for (const p of state.places) {
     if (!accessible(p) || !p.path?.length) continue;
@@ -192,7 +205,8 @@ function renderCesiumOverlays() {
     const route = state.map.entities.add({ polyline: { positions: pos, width: 4, material: Cesium.Color.fromCssColorString('#276d5d'), clampToGround: false } });
     state.routeEntities.push(route);
     const end = path[path.length - 1];
-    const marker = state.map.entities.add({ position: Cesium.Cartesian3.fromDegrees(end[0], end[1], end[2] ?? 24), point: { pixelSize: 9, color: Cesium.Color.fromCssColorString(p.kind === 'green' ? '#276d5d' : '#ca974b'), outlineColor: Cesium.Color.WHITE, outlineWidth: 2, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND }, label: { text: p.name, font: '11px DM Sans', pixelOffset: new Cesium.Cartesian2(12, -8), fillColor: Cesium.Color.fromCssColorString('#26302a'), outlineColor: Cesium.Color.WHITE, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND, show: true } });
+    const endpointHeightReference = Number.isFinite(Number(end[2])) ? Cesium.HeightReference.NONE : Cesium.HeightReference.CLAMP_TO_GROUND;
+    const marker = state.map.entities.add({ position: Cesium.Cartesian3.fromDegrees(end[0], end[1], end[2] ?? 24), point: { pixelSize: 9, color: Cesium.Color.fromCssColorString(p.kind === 'green' ? '#276d5d' : '#ca974b'), outlineColor: Cesium.Color.WHITE, outlineWidth: 2, heightReference: endpointHeightReference }, label: { text: p.name, font: '11px DM Sans', pixelOffset: new Cesium.Cartesian2(12, -8), fillColor: Cesium.Color.fromCssColorString('#26302a'), outlineColor: Cesium.Color.WHITE, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, heightReference: endpointHeightReference, show: true } });
     state.markerEntities.push(marker);
   }
 }
@@ -249,11 +263,7 @@ function escapeHtml(value) { return String(value).replace(/[&<>"']/g, c => ({ '&
 function haversineMetres(a, b) {
   const rad = Math.PI / 180, phi1 = a[1] * rad, phi2 = b[1] * rad;
   const dPhi = (b[1] - a[1]) * rad, dLambda = (b[0] - a[0]) * rad;
-  const h = Math.sin(dPhi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLambda / 2) ** 2;
-  return 6371008.8 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-}
-function buildLandsDStops(place, origin) {
-  const point = (name, longitude, latitude) => ({ attributes: { Name: name }, geometry: { spatialReference: { latestWkid: 4326 }, x: longitude, y: latitude, z: 0 } });
+  const h = Math.sin(dPhi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.…36 tokens truncated…st point = (name, longitude, latitude) => ({ attributes: { Name: name }, geometry: { spatialReference: { latestWkid: 4326 }, x: longitude, y: latitude, z: 0 } });
   return { features: [point('Western District Elderly Community Centre', origin.longitude, origin.latitude), point(place.name, place.coordinates[0], place.coordinates[1])] };
 }
 async function landsDRoute(place, origin) {
@@ -327,7 +337,7 @@ async function buildLandsDContour(origin, originVersion) {
   if (originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope) return;
   state.boundarySamples = boundary.length;
   if (boundary.length >= 12) {
-    const coordinates = boundary.sort((a, b) => a.bearing - b.bearing).map(point => point.coordinate.slice(0, 2));
+    const coordinates = boundary.sort((a, b) => a.bearing - b.bearing).map(point => point.coordinate.slice());
     coordinates.push(coordinates[0]);
     state.isochrone = { type: 'Feature', properties: { method: '24 sampled Lands Department 3D routes clipped at returned travel-time and grade limits; travel time is apportioned by route length', sample_count: boundary.length, walk_time_seconds: walkTimeSeconds, equivalent_distance_m: distanceMetres, max_slope_deg: maxSlope }, geometry: { type: 'Polygon', coordinates: [coordinates] } };
   } else state.isochrone = null;
