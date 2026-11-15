@@ -1,9 +1,9 @@
-const ORIGIN = { latitude: 22.2833, longitude: 114.1285 };
+const ORIGIN = { latitude: 22.2855625, longitude: 114.1347709 };
 const MAP_CENTER = { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude };
 const $ = (id) => document.getElementById(id);
 const apiUrl = (path) => new URL(`${location.pathname.includes('/static/') ? '../' : './'}api/${path}`, document.baseURI).toString();
 const staticUrl = (path) => new URL(`./${path}`, document.baseURI).toString();
-const state = { distanceMetres: 300, walkTimeSeconds: 300, slope: 10, filter: 'all', view: 'terrain', places: [], google: false, isochrone: null, boundarySamples: 0, sectionPlaceId: null, map: null, maplibre: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, googleAnalysisVersion: 0, googleController: null, routeFailures: new Set(), boundaryCache: new Map() };
+const state = { distanceMetres: 300, walkTimeSeconds: 300, slope: 10, filter: 'all', view: 'map', mapStyle: 'detailed', massingStyle: 'detailed', reachStyle: 'detailed', places: [], google: false, isochrone: null, boundarySamples: 0, sectionPlaceId: null, map: null, maplibre: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, googleAnalysisVersion: 0, googleController: null, routeFailures: new Set(), boundaryCache: new Map() };
 
 function formatDistance(m) { return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`; }
 function durationMinutes(p) { return p.duration_s != null ? p.duration_s / 60 : null; }
@@ -80,7 +80,7 @@ async function loadAccessPoints() {
       const kind = properties.kind === 'gym' || /fitness|exercise|gym/i.test(String(properties.kind || properties.facility_type || properties.category || '')) ? 'gym' : 'green';
       const id = String(feature.id || properties.id || `${kind}-${i + 1}`);
       const dlon = coordinates[0] - ORIGIN.longitude, dlat = coordinates[1] - ORIGIN.latitude;
-      return { ...properties, id, name: String(properties.name || `Public ${kind === 'gym' ? 'fitness point' : 'open space'} ${i + 1}`), kind, coordinates, study_distance_m: Number(properties.study_extent_distance_m || Math.hypot(dlon * 102000, dlat * 111000)) };
+      return { ...properties, id, name: String(properties.name || `Public ${kind === 'gym' ? 'fitness point' : 'open space'} ${i + 1}`), kind, coordinates, study_distance_m: haversineMetres([ORIGIN.longitude, ORIGIN.latitude], coordinates) };
     }).filter(Boolean);
     if (!loaded.length) return;
     state.places = loaded; render();
@@ -97,38 +97,85 @@ function focusPlace(id) {
   $('place-list').querySelector(`[data-id="${id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   showToast(place.routeAnalysis ? `${place.name} · ${Math.max(1, Math.round(durationMinutes(place)))} min walking route` : `${place.name} · walking route is pending`);
   const coordinates = place.coordinates;
-  if (state.map && coordinates) state.map.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(coordinates[0], coordinates[1], 950), duration: 1.2 });
-  if (state.maplibre && coordinates) state.maplibre.flyTo({ center: coordinates, zoom: 17, pitch: 48, duration: 1000 });
+  if (state.view !== 'map' && state.map && coordinates) state.map.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(coordinates[0], coordinates[1], 950), duration: 1.2 });
+  if (state.maplibre && coordinates && (state.view === 'map' || !state.map)) state.maplibre.flyTo({ center: coordinates, zoom: 17, pitch: state.view === 'map' ? 0 : 48, duration: 1000 });
 }
 let toastTimer;
 function showToast(message) { const el = $('toast'); el.textContent = message; el.classList.add('visible'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('visible'), 2300); }
+function currentStyle() { return state.view === 'map' ? state.mapStyle : state.view === 'massing' ? state.massingStyle : state.reachStyle; }
+function setMapStyle(style) {
+  if (state.view === 'map') state.mapStyle = style;
+  else if (state.view === 'massing') state.massingStyle = style;
+  else if (state.view === 'reach') state.reachStyle = style;
+  document.querySelectorAll('.style-option').forEach(button => {
+    const selected = button.dataset.style === style;
+    button.classList.toggle('selected', selected); button.setAttribute('aria-pressed', String(selected));
+  });
+  applyPresentation();
+}
 function setView(mode) {
   state.view = mode;
-  document.querySelectorAll('.view-option').forEach(b => b.classList.toggle('selected', b.dataset.view === mode));
-  document.querySelector('.map-shell').classList.toggle('diagram-mode', mode === 'diagram');
-  document.querySelector('.map-shell').classList.toggle('section-mode', mode === 'section');
-  $('section-panel').hidden = mode !== 'section';
-  renderSectionMap();
-  if (state.maplibre && mode !== 'section') requestAnimationFrame(() => state.maplibre.resize());
-  if (state.maplibre) $('map-data-label').textContent = mode === 'terrain' ? '3D BUILDINGS · OSM STREET MAP' : mode === 'diagram' ? 'SIMPLIFIED 3D ACCESS DIAGRAM' : '3D ELEVATION SECTION';
-  if (state.map) { state.map.scene.screenSpaceCameraController.enableTilt = mode === 'terrain'; state.map.scene.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(114.1285, 22.2833, mode === 'terrain' ? 1400 : 2400), orientation: { heading: 0, pitch: mode === 'terrain' ? Cesium.Math.toRadians(-48) : Cesium.Math.toRadians(-68), roll: 0 }, duration: .7 }); }
+  if (mode === 'section') {
+    document.querySelector('.map-shell').classList.add('section-mode');
+    $('map-data-label').textContent = '3D ROUTE ELEVATION PROFILE';
+    $('section-panel').hidden = false;
+    document.querySelectorAll('.view-option').forEach(b => { b.classList.toggle('selected', false); b.setAttribute('aria-pressed','false'); });
+    renderSectionMap(); return;
+  }
+  document.querySelector('.map-shell').classList.remove('section-mode');
+  $('section-panel').hidden = true;
+  document.querySelectorAll('.view-option').forEach(b => {
+    const selected = b.dataset.view === mode;
+    b.classList.toggle('selected', selected); b.setAttribute('aria-pressed', String(selected));
+  });
+  setMapStyle(currentStyle());
+}
+function applyPresentation() {
+  const style = currentStyle(), view = state.view, threeD = view !== 'map';
+  const useCesium = threeD && Boolean(state.map);
+  $('cesium-container').style.display = useCesium ? 'block' : 'none';
+  $('maplibre-container').style.display = useCesium || !state.maplibre ? 'none' : 'block';
+  const shell = document.querySelector('.map-shell');
+  shell.classList.toggle('diagram-mode', style === 'diagram');
+  shell.classList.toggle('reach-mode', view === 'reach');
+  $('presentation-title').textContent = `${view === 'map' ? '2D map' : view === 'massing' ? '3D massing' : '3D reach'} · ${style}`;
   if (state.maplibre) {
-    for (const layer of state.maplibre.getStyle().layers) {
-      if (layer.type === 'fill-extrusion') {
-        state.maplibre.setLayoutProperty(layer.id, 'visibility', mode === 'section' ? 'none' : 'visible');
-        state.maplibre.setPaintProperty(layer.id, 'fill-extrusion-opacity', mode === 'diagram' ? .46 : .58);
+    const map = state.maplibre;
+    for (const layer of map.getStyle().layers) {
+      if (layer.id === '3d-buildings') {
+        map.setLayoutProperty(layer.id, 'visibility', threeD ? 'visible' : 'none');
+        map.setPaintProperty(layer.id, 'fill-extrusion-color', style === 'diagram' ? '#f7f7f1' : '#b7c1b3');
+        map.setPaintProperty(layer.id, 'fill-extrusion-opacity', style === 'diagram' ? .96 : .72);
+      } else if (layer.id === 'reach-mask-fill') {
+        map.setLayoutProperty(layer.id, 'visibility', view === 'reach' ? 'visible' : 'none');
+      } else if (layer.id.startsWith('walk-buffer-')) {
+        map.setLayoutProperty(layer.id, 'visibility', view === 'reach' || view === 'map' ? 'visible' : 'none');
+      } else if (!['accessible-route-casing','accessible-routes','access-place-points','access-place-labels','origin-point','origin-label'].includes(layer.id)) {
+        if (layer.type === 'fill' && layer.paint?.['fill-color']) {
+          const id = layer.id.toLowerCase();
+          map.setPaintProperty(layer.id, 'fill-color', id.includes('water') ? '#bfd2d0' : id.includes('park') || id.includes('grass') ? '#dce6d9' : style === 'diagram' ? '#e7e8df' : '#d9ddd4');
+        }
+        if (layer.type === 'line' && layer.paint?.['line-color']) map.setPaintProperty(layer.id, 'line-color', style === 'diagram' ? '#c5c9bf' : '#aeb5ac');
       }
     }
-    if (mode !== 'section') state.maplibre.flyTo({ center: state.maplibre.getCenter(), zoom: mode === 'terrain' ? 15.6 : 16.2, pitch: mode === 'terrain' ? 12 : 24, bearing: mode === 'terrain' ? -12 : 0, duration: 700 });
+    map.flyTo({ center: [ORIGIN.longitude, ORIGIN.latitude], zoom: threeD ? 16.3 : 15.6, pitch: threeD ? 48 : 0, bearing: threeD && style === 'detailed' ? -12 : 0, duration: 550 });
+    requestAnimationFrame(() => map.resize());
   }
+  if (state.map) {
+    state.map.scene.screenSpaceCameraController.enableTilt = threeD;
+    state.map.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(ORIGIN.longitude, ORIGIN.latitude, threeD ? 1100 : 1750), orientation: { heading: 0, pitch: Cesium.Math.toRadians(threeD ? -50 : -72), roll: 0 }, duration: .6 });
+  }
+  $('map-data-label').textContent = view === 'map' ? `2D ${style.toUpperCase()} MAP · ROUTE-TIME REACH` : view === 'massing' ? `3D ${style.toUpperCase()} MASSING · ACCESS ROUTES` : `3D ${style.toUpperCase()} REACH · BUFFER + ROUTES`;
+  renderMapLibreOverlays(); renderCesiumOverlays();
 }
+
 function renderCesiumOverlays() {
   if (!state.map) return;
   for (const entity of [...state.routeEntities, ...state.markerEntities]) state.map.entities.remove(entity);
   state.routeEntities = []; state.markerEntities = [];
   const origin = state.map.entities.add({ position: Cesium.Cartesian3.fromDegrees(ORIGIN.longitude, ORIGIN.latitude, 20), point: { pixelSize: 12, color: Cesium.Color.fromCssColorString('#cb5237'), outlineColor: Cesium.Color.WHITE, outlineWidth: 3, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND }, label: { text: 'COMMUNITY CENTRE', font: '12px DM Sans', pixelOffset: new Cesium.Cartesian2(16, -12), fillColor: Cesium.Color.fromCssColorString('#9e4535'), outlineColor: Cesium.Color.WHITE, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND } });
   state.markerEntities.push(origin);
-  const ring = state.isochrone?.geometry;
+  const ring = (state.view === 'reach' || state.view === 'map') ? state.isochrone?.geometry : null;
   if (ring?.type === 'Polygon') {
     const contour = ring.coordinates[0].flatMap(c => c.slice(0, 2));
     state.routeEntities.push(state.map.entities.add({ polygon: { hierarchy: Cesium.Cartesian3.fromDegreesArray(contour), material: Cesium.Color.fromCssColorString('#cb5237').withAlpha(.18), outline: true, outlineColor: Cesium.Color.fromCssColorString('#cb5237').withAlpha(.9), outlineWidth: 2, height: 8 } }));
@@ -180,9 +227,16 @@ function renderMapLibreOverlays() {
   });
   const routeData = { type: 'FeatureCollection', features: routes };
   const placeData = { type: 'FeatureCollection', features: places };
-  const bufferData = { type: 'FeatureCollection', features: state.isochrone ? [state.isochrone] : [] };
+  const bufferData = { type: 'FeatureCollection', features: state.isochrone && (state.view === 'reach' || state.view === 'map') ? [state.isochrone] : [] };
+  const extent = Array.from({length: 8}, (_, i) => radialDestination(ORIGIN, 12000, i * 45)); extent.push(extent[0]);
+  const signedArea = ring => ring.slice(0, -1).reduce((area, point, i) => { const next = ring[i + 1]; return area + point[0] * next[1] - next[0] * point[1]; }, 0) / 2;
+  if (signedArea(extent) < 0) extent.reverse();
+  const innerRing = state.isochrone?.geometry?.type === 'Polygon' ? state.isochrone.geometry.coordinates[0].map(point => point.slice()) : null;
+  if (innerRing && signedArea(innerRing) > 0) innerRing.reverse();
+  const reachMask = innerRing ? { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [extent, innerRing] } } : null;
+  const maskData = { type: 'FeatureCollection', features: reachMask ? [reachMask] : [] };
   const originData = { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { name: 'Western District Elderly Community Centre' }, geometry: { type: 'Point', coordinates: [ORIGIN.longitude, ORIGIN.latitude] } }] };
-  map.getSource('access-routes')?.setData(routeData); map.getSource('access-places')?.setData(placeData); map.getSource('walk-buffer')?.setData(bufferData); map.getSource('map-origin')?.setData(originData);
+  map.getSource('access-routes')?.setData(routeData); map.getSource('access-places')?.setData(placeData); map.getSource('walk-buffer')?.setData(bufferData); map.getSource('reach-mask')?.setData(maskData); map.getSource('map-origin')?.setData(originData);
   renderMapLibreSvgRoutes();
 }
 function escapeHtml(value) { return String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
@@ -321,10 +375,12 @@ function addMapLibreLayers(map) {
   map.addSource('openfreemap', { type: 'vector', url: 'https://tiles.openfreemap.org/planet' });
   map.addLayer({ id: '3d-buildings', source: 'openfreemap', 'source-layer': 'building', type: 'fill-extrusion', minzoom: 14, filter: ['!=', ['get', 'hide_3d'], true], paint: { 'fill-extrusion-color': '#c5c8ba', 'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 14, 0, 15, ['coalesce', ['get', 'render_height'], 15]], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0], 'fill-extrusion-opacity': .58 } });
   map.addSource('walk-buffer', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addSource('reach-mask', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addSource('access-routes', { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, lineMetrics: true });
   map.addSource('access-places', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addSource('map-origin', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-  map.addLayer({ id: 'walk-buffer-fill', type: 'fill', source: 'walk-buffer', paint: { 'fill-color': '#cb634c', 'fill-opacity': .2 } });
+  map.addLayer({ id: 'reach-mask-fill', type: 'fill', source: 'reach-mask', paint: { 'fill-color': '#f3f4ed', 'fill-opacity': .78 } });
+  map.addLayer({ id: 'walk-buffer-fill', type: 'fill', source: 'walk-buffer', paint: { 'fill-color': '#cb634c', 'fill-opacity': .24 } });
   map.addLayer({ id: 'walk-buffer-outline', type: 'line', source: 'walk-buffer', paint: { 'line-color': '#c85d45', 'line-width': 2.5, 'line-dasharray': [2, 2], 'line-opacity': .95 } });
   map.addLayer({ id: 'accessible-route-casing', type: 'line', source: 'access-routes', paint: { 'line-color': '#fffdf6', 'line-width': 9, 'line-opacity': .96 } });
   map.addLayer({ id: 'accessible-routes', type: 'line', source: 'access-routes', paint: { 'line-color': '#16755f', 'line-width': 5, 'line-opacity': 1 } });
@@ -348,47 +404,54 @@ function addMapLibreLayers(map) {
 }
 function initMapLibre() {
   if (!window.maplibregl) { showToast('The 3D map library did not load. Check the connection and refresh.'); return; }
-  const map = new maplibregl.Map({ container: 'maplibre-container', style: 'https://tiles.openfreemap.org/styles/liberty', center: [MAP_CENTER.longitude, MAP_CENTER.latitude], zoom: 15.6, pitch: 12, bearing: -12, maxPitch: 65, attributionControl: true, antialias: true, cooperativeGestures: true });
+  const map = new maplibregl.Map({ container: 'maplibre-container', style: 'https://tiles.openfreemap.org/styles/liberty', center: [MAP_CENTER.longitude, MAP_CENTER.latitude], zoom: 15.6, pitch: 0, bearing: 0, maxPitch: 65, attributionControl: true, antialias: true, cooperativeGestures: true });
   state.maplibre = map;
   map.addControl(new maplibregl.NavigationControl({ showCompass: false, showZoom: false }), 'top-right');
   map.on('load', () => {
     try { addMapLibreLayers(map); }
     catch (error) { console.error('Could not add 3D building layer', error); showToast('Map loaded, but building extrusions are unavailable.'); }
-    $('maplibre-container').style.display = 'block';
     $('data-status').textContent = 'OPENSTREETMAP 3D BUILDINGS · CSDI DESTINATIONS';
     $('map-data-label').textContent = '3D BUILDINGS · OSM STREET MAP'; $('map-attribution').textContent = 'Map from Lands Department · © OpenStreetMap contributors';
-    map.once('idle', renderMapLibreOverlays);
+    map.once('idle', () => { applyPresentation(); renderMapLibreOverlays(); });
   });
   map.on('error', e => { if (e.error) console.warn('MapLibre tile/style issue:', e.error.message); });
 }
 async function initGoogle() {
+  let config = {};
+  try { config = await fetch(apiUrl('config')).then(r => r.json()); }
+  catch (error) { console.warn('Map backend configuration unavailable; using Hong Kong open-data basemap.', error); }
+  initMapLibre();
+  scheduleLandsDAnalysis();
+  if (!window.Cesium || (!config.google_enabled && !config.landsd_3d_enabled)) return;
   try {
-    const config = await fetch(apiUrl('config')).then(r => r.json());
-    if (!config.google_enabled || !window.Cesium) { initMapLibre(); scheduleLandsDAnalysis(); return; }
-    state.google = true;
+    state.google = Boolean(config.google_enabled);
     const viewer = new Cesium.Viewer('cesium-container', { animation: false, baseLayerPicker: false, fullscreenButton: false, geocoder: false, homeButton: false, infoBox: false, sceneModePicker: false, selectionIndicator: false, timeline: false, navigationHelpButton: false, creditContainer: $('google-credits'), skyAtmosphere: new Cesium.SkyAtmosphere(), baseLayer: false });
     viewer.scene.globe.show = false; viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#d4ded4');
     viewer.scene.screenSpaceCameraController.enableCollisionDetection = false;
-    const tiles = await Cesium.Cesium3DTileset.fromUrl(apiUrl('google-3d-tiles/v1/3dtiles/root.json'), { showCreditsOnScreen: true });
+    const endpoint = config.google_enabled ? apiUrl('google-3d-tiles/v1/3dtiles/root.json') : apiUrl('landsd-3d-tiles/f2/tileset.json');
+    const tiles = await Cesium.Cesium3DTileset.fromUrl(endpoint, { showCreditsOnScreen: true });
     viewer.scene.primitives.add(tiles);
-    viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(114.1285, 22.2833, 1450), orientation: { heading: Cesium.Math.toRadians(12), pitch: Cesium.Math.toRadians(-48), roll: 0 } });
+    viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(ORIGIN.longitude, ORIGIN.latitude, 1450), orientation: { heading: Cesium.Math.toRadians(12), pitch: Cesium.Math.toRadians(-48), roll: 0 } });
     viewer.scene.globe.depthTestAgainstTerrain = true;
     state.map = viewer;
-    $('cesium-container').style.display = 'block';
-    $('data-status').textContent = 'GOOGLE 3D TILES · OPEN DATA LAYERS'; $('map-data-label').textContent = 'GOOGLE PHOTOREALISTIC 3D';
-    $('map-attribution').textContent = 'Lands Department · CSDI destination overlays';
+    $('data-status').textContent = config.google_enabled ? 'GOOGLE PHOTOREALISTIC 3D · HONG KONG ACCESS DATA' : 'LANDS DEPARTMENT 3D MAP · HONG KONG ACCESS DATA';
+    $('map-attribution').textContent = config.google_enabled ? 'Google Maps Platform · Lands Department destination and route overlays' : '3D visualisation map © Lands Department, HKSAR Government · CSDI route and destination data';
     $('map-attribution').classList.add('third-party-attribution');
-    $('google-credits').classList.add('active');
-    renderCesiumOverlays();
+    if (config.google_enabled) { $('google-credits').classList.add('active'); $('map-attribution').textContent = 'Lands Department · CSDI destination overlays'; }
+    renderCesiumOverlays(); applyPresentation();
     new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas).setInputAction((evt) => {
       if (!state.pickOrigin) return;
       const ray = viewer.camera.getPickRay(evt.position); const point = viewer.scene.globe.pick(ray, viewer.scene);
       if (!point) return;
-      const carto = Cesium.Cartographic.fromCartesian(point); ORIGIN.latitude = Cesium.Math.toDegrees(carto.latitude); ORIGIN.longitude = Cesium.Math.toDegrees(carto.longitude); state.originVersion++; state.pickOrigin = false; $('locate-origin').textContent = '⌖  SET ON MAP'; state.places = state.places.map(p => ({ ...p, routeAnalysis: false, routeError: false })); state.routeFailures.clear(); showToast('Origin updated. Recalculating walking routes.'); scheduleGoogleAnalysis();
+      const carto = Cesium.Cartographic.fromCartesian(point); ORIGIN.latitude = Cesium.Math.toDegrees(carto.latitude); ORIGIN.longitude = Cesium.Math.toDegrees(carto.longitude); state.originVersion++; state.pickOrigin = false; $('locate-origin').textContent = '⌖  SET ON MAP'; state.places = state.places.map(p => ({ ...p, routeAnalysis: false, routeError: false })); state.routeFailures.clear(); showToast('Origin updated. Recalculating walking routes.'); if (state.google) scheduleGoogleAnalysis(); else scheduleLandsDAnalysis();
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-    scheduleGoogleAnalysis();
-  } catch (error) { console.warn('Google backend unavailable; starting the open-data 3D view.', error); if (!state.map) initMapLibre(); scheduleLandsDAnalysis(); }
+    if (state.google) scheduleGoogleAnalysis();
+  } catch (error) {
+    console.warn('Detailed 3D tile service unavailable; using interactive 3D building fallback.', error);
+    showToast('Detailed 3D tiles are unavailable. OpenStreetMap 3D buildings remain available.');
+  }
 }
+
 let requestTimer;
 function scheduleGoogleAnalysis() {
   clearTimeout(requestTimer);
@@ -426,10 +489,12 @@ async function runGoogleAnalysis(version) {
 $('distance').addEventListener('input', setRange); $('slope').addEventListener('input', setRange);
   document.querySelectorAll('.filter').forEach(b => b.addEventListener('click', () => { state.filter = b.dataset.filter; document.querySelectorAll('.filter').forEach(item => item.classList.toggle('active', item === b)); render(); }));
 document.querySelectorAll('.view-option').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
+document.querySelectorAll('.style-option').forEach(b => b.addEventListener('click', () => setMapStyle(b.dataset.style)));
+document.querySelector('.profile-option').addEventListener('click', () => setView('section'));
 $('about-btn').addEventListener('click', () => $('about-dialog').showModal()); $('source-btn').addEventListener('click', () => $('about-dialog').showModal());
 document.querySelector('.dialog-close').addEventListener('click', () => $('about-dialog').close()); $('about-dialog').addEventListener('click', e => { if (e.target === $('about-dialog')) $('about-dialog').close(); });
 $('locate-origin').addEventListener('click', () => { if (!state.map && !state.maplibre) return showToast('The map is still loading.'); state.pickOrigin = true; $('locate-origin').textContent = 'CLICK MAP TO SET'; showToast('Click the map to move the origin.'); });
-$('zoom-in').addEventListener('click', () => { if (state.map) state.map.camera.zoomIn(250); else if (state.maplibre) state.maplibre.zoomIn({ duration: 250 }); });
-$('zoom-out').addEventListener('click', () => { if (state.map) state.map.camera.zoomOut(250); else if (state.maplibre) state.maplibre.zoomOut({ duration: 250 }); });
-$('reset-view').addEventListener('click', () => { if (state.map) setView(state.view); else if (state.maplibre) state.maplibre.flyTo({ center: [MAP_CENTER.longitude, MAP_CENTER.latitude], zoom: 15.6, pitch: state.view === 'terrain' ? 12 : 24, bearing: state.view === 'terrain' ? -12 : 0, duration: 700 }); });
+$('zoom-in').addEventListener('click', () => { if (state.view !== 'map' && state.map) state.map.camera.zoomIn(250); else if (state.maplibre) state.maplibre.zoomIn({ duration: 250 }); });
+$('zoom-out').addEventListener('click', () => { if (state.view !== 'map' && state.map) state.map.camera.zoomOut(250); else if (state.maplibre) state.maplibre.zoomOut({ duration: 250 }); });
+$('reset-view').addEventListener('click', () => { if (state.view !== 'map' && state.map) setView(state.view); else if (state.maplibre) state.maplibre.flyTo({ center: [ORIGIN.longitude, ORIGIN.latitude], zoom: 15.6, pitch: state.view === 'map' ? 0 : 48, bearing: state.view === 'map' ? 0 : -12, duration: 700 }); });
 setRange(); loadAccessPoints().then(initGoogle);

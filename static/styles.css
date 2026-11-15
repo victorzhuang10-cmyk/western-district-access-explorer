@@ -49,3 +49,21 @@
 @media(max-width:1050px){.map-live{font-size:9px}}
 @media(max-width:760px){.map-live{font-size:8px}.map-context small{font-size:9px}.map-attribution{display:block;max-width:calc(100% - 30px);font-size:9px}.map-zoom-hint{font-size:9px}}
 .sidebar{overflow-x:hidden}.time-chip{width:max-content;max-width:100%;white-space:normal;line-height:1.35}.time-chip span:last-child{min-width:0}
+
+/* The six clear presentation states: 2D street map, 3D massing, 3D reach. */
+.view-switcher{width:310px;padding:13px 14px;background:#fbfaf5f2}
+.presentation-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.presentation-tabs .view-option{justify-content:center;padding:9px 4px;border:1px solid #d9ddd3;background:#f3f2ec;color:#596056}
+.presentation-tabs .view-option b{font:600 9px var(--mono);letter-spacing:.025em;white-space:nowrap}
+.presentation-tabs .view-option.selected{background:#dce9df;border-color:#a9c3b2;color:#245e4f}
+.style-tabs{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:9px;padding:3px;background:#eeeee7}
+.style-option{min-height:34px;border:1px solid transparent;background:none;color:#687066;font:500 11px var(--ui);cursor:pointer}
+.style-option.selected{background:#fffefa;border-color:#dddcd2;color:#30382f;box-shadow:0 1px 3px #26352b14}
+.profile-option{display:block;width:100%;margin-top:7px;padding:6px 2px;border:0;background:none;text-align:left;color:#56715f;font:500 10px var(--ui);cursor:pointer}
+.profile-option:hover{text-decoration:underline}
+.diagram-mode #map-route-overlay .map-route-casing{stroke:#fff}
+.diagram-mode #map-route-overlay .map-route-line{stroke-width:5.5;filter:none}
+.reach-mode #walk-buffer-fill{fill-opacity:.3}
+.section-mode .view-switcher{width:310px}
+@media(max-width:1050px){.view-switcher{width:300px}}
+@media(max-width:760px){.view-switcher{width:min(310px,calc(100% - 24px));right:12px;bottom:12px;transform:none;padding:10px}.presentation-tabs .view-option{padding:8px 2px}.presentation-tabs .view-option b{font-size:8px}.map-caption{max-width:calc(100% - 20px)}}

@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
   <link href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=google-credits-11" />
+  <link rel="stylesheet" href="./styles.css?v=hill-court-14" />
 </head>
 <body>
   <header class="topbar">
@@ -33,7 +33,7 @@
 
       <section class="origin-card">
         <div class="section-kicker"><span class="step-no">01</span><span>STARTING POINT</span><button class="edit-origin" id="locate-origin">⌖ &nbsp; SET ON MAP</button></div>
-        <div class="origin-row"><span class="origin-pin"><i></i></span><div><strong>Western District Elderly</strong><small>Community Centre · Kennedy Town</small></div><button class="chevron" aria-label="Origin details">↗</button></div>
+        <div class="origin-row"><span class="origin-pin"><i></i></span><div><strong>Western District Elderly</strong><small>Hill Court · 28 Hill Road, Sai Ying Pun</small></div><button class="chevron" aria-label="Origin details">↗</button></div>
         <div class="origin-note"><span>●</span> Approximate location · confirm entrance</div>
       </section>
 
@@ -65,13 +65,22 @@
       <div id="cesium-container" class="map-canvas"></div>
       <div id="maplibre-container" class="map-canvas" aria-label="Interactive 3D map with OpenStreetMap buildings"></div>
       <svg id="map-route-overlay" class="map-route-overlay" aria-hidden="true"></svg>
-      <div class="map-topline"><div class="map-context"><span class="context-mark">⌖</span><span><b>KENNEDY TOWN</b><small>WESTERN DISTRICT, HONG KONG</small></span></div><div class="map-live"><i></i> <span id="map-data-label">ILLUSTRATIVE 3D STUDY</span></div></div>
+      <div class="map-topline"><div class="map-context"><span class="context-mark">⌖</span><span><b>SAI YING PUN</b><small>WESTERN DISTRICT, HONG KONG</small></span></div><div class="map-live"><i></i> <span id="map-data-label">2D MAP · HILL COURT, 28 HILL ROAD</span></div></div>
       <div class="map-controls"><button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button><button id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button><span></span><button id="reset-view" title="Reset view" aria-label="Reset view">⌖</button></div>
 
       <div class="map-caption"><span class="caption-mark">3D</span><span><b>WALK-TIME REACH</b><small>ROUTED TIME · PATHS · SLOPE</small></span><span class="caption-rule"></span><span class="caption-radius"><b id="caption-distance">5</b> MIN</span></div>
 
       <div id="section-panel" class="section-panel" aria-label="3D elevation section" hidden></div>
-      <div class="view-switcher"><div class="switch-copy"><span>MAP PRESENTATION</span><small>Choose how to read this place</small></div><button class="view-option selected" data-view="terrain"><span class="view-thumb thumb-terrain"><i></i></span><span><b>3D CITY</b><small>Place in context</small></span><i class="radio"></i></button><button class="view-option" data-view="diagram"><span class="view-thumb thumb-diagram"><i></i></span><span><b>3D DIAGRAM</b><small>Routes &amp; reach</small></span><i class="radio"></i></button><button class="view-option" data-view="section"><span class="view-thumb thumb-section"><i></i></span><span><b>3D SECTION</b><small>Terrain &amp; grade</small></span><i class="radio"></i></button></div>
+      <div class="view-switcher" aria-label="Map presentation">
+        <div class="switch-copy"><span>MAP PRESENTATION</span><small id="presentation-title">2D map · detailed</small></div>
+        <div class="presentation-tabs" role="group" aria-label="Choose map type">
+          <button class="view-option selected" data-view="map" aria-pressed="true"><b>2D MAP</b></button>
+          <button class="view-option" data-view="massing" aria-pressed="false"><b>3D MASSING</b></button>
+          <button class="view-option" data-view="reach" aria-pressed="false"><b>3D REACH</b></button>
+        </div>
+        <div class="style-tabs" role="group" aria-label="Map detail style"><button class="style-option selected" data-style="detailed" aria-pressed="true">Detailed</button><button class="style-option" data-style="diagram" aria-pressed="false">Diagram</button></div>
+        <button class="profile-option" data-view="section">Open route elevation profile ↗</button>
+      </div>
       <div class="north-arrow">N <span>↑</span></div>
       <a class="landsd-mark" href="https://www.landsd.gov.hk/" target="_blank" rel="noreferrer" aria-label="Lands Department, Government of Hong Kong"><span>地政總署</span><b>LANDS DEPARTMENT</b></a>
       <div class="map-attribution" id="map-attribution">OPENFREEMAP · © OPENSTREETMAP CONTRIBUTORS</div>
@@ -81,10 +90,10 @@
     </section>
   </main>
 
-  <dialog id="about-dialog"><button class="dialog-close" aria-label="Close">×</button><div class="eyebrow">FIELDNOTES / METHOD</div><h2>Access, measured<br/><em>by the walk.</em></h2><p>The 100 m–2 km slider sets a walking-time budget using a 1 m/s reference pace (for example, 300 m = 5 minutes). Places and the mapped reach are included by route travel time, then screened by the steepest sampled route slope. Google Maps Routes time is used when its backend is configured; the public static preview uses Lands Department 3D Pedestrian Route times.</p><p>The shaded reach is a sampled contour, not a complete isochrone. Google walking routes can omit clear sidewalks or pedestrian paths; neither route source verifies steps, kerbs, surface quality, crossing safety, step-free access, equipment condition, or opening hours. Public open-space records are points, not green parcel boundaries. Field checks are needed before product decisions.</p><a href="https://data.gov.hk/en-data/dataset/hk-lcsd-facility-facility-ofe" target="_blank" rel="noreferrer">Outdoor Fitness Equipment · DATA.GOV.HK ↗</a><a href="https://data.gov.hk/en-data/dataset/hk-landsd-openmap-public-open-space" target="_blank" rel="noreferrer">Public Open Space · Lands Department ↗</a><div class="dialog-credit">3D PEDESTRIAN NETWORK: LAND DEPARTMENT · CSDI<br/>3D BASEMAP: OPENFREEMAP · OPENSTREETMAP<br/>SPATIAL PREPARATION: GEOPANDAS · EPSG:2326</div></dialog>
+  <dialog id="about-dialog"><button class="dialog-close" aria-label="Close">×</button><div class="eyebrow">FIELDNOTES / METHOD</div><h2>Access, measured<br/><em>by the walk.</em></h2><p>The 100 m–2 km slider sets a walking-time budget using a 1 m/s reference pace (for example, 300 m = 5 minutes). Places and the mapped reach are included by route travel time, then screened by the steepest sampled route slope. Google Maps Routes time is used when its backend is configured; the public static preview uses Lands Department 3D Pedestrian Route times.</p><p>The shaded reach is a sampled contour, not a complete isochrone. Google walking routes can omit clear sidewalks or pedestrian paths; neither route source verifies steps, kerbs, surface quality, crossing safety, step-free access, equipment condition, or opening hours. Public open-space records are points, not green parcel boundaries. Field checks are needed before product decisions.</p><a href="https://data.gov.hk/en-data/dataset/hk-lcsd-facility-facility-ofe" target="_blank" rel="noreferrer">Outdoor Fitness Equipment · DATA.GOV.HK ↗</a><a href="https://data.gov.hk/en-data/dataset/hk-landsd-openmap-public-open-space" target="_blank" rel="noreferrer">Public Open Space · Lands Department ↗</a><div class="dialog-credit">3D PEDESTRIAN NETWORK: LAND DEPARTMENT · CSDI<br/>3D BASEMAP: LANDSD 3D TILES WHEN CONFIGURED · OSM MASSING FALLBACK<br/>SPATIAL PREPARATION: GEOPANDAS · EPSG:2326</div></dialog>
 
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Cesium.js"></script>
   <script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.2/dist/maplibre-gl.js'"></script>
-  <script src="./app.js?v=route-timeout-13"></script>
+  <script src="./app.js?v=hill-court-14"></script>
 </body>
 </html>

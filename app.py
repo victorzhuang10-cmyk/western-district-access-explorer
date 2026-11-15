@@ -18,7 +18,8 @@ from pydantic import BaseModel, Field
 load_dotenv()
 ROOT = Path(__file__).parent
 API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "").strip()
-ORIGIN = {"latitude": float(os.getenv("ORIGIN_LAT", "22.2833")), "longitude": float(os.getenv("ORIGIN_LNG", "114.1285"))}
+LANDSD_3D_API_KEY = os.getenv("LANDSD_3D_MAP_API_KEY", "").strip()
+ORIGIN = {"latitude": float(os.getenv("ORIGIN_LAT", "22.2855625")), "longitude": float(os.getenv("ORIGIN_LNG", "114.1347709"))}
 DATA_FILE = Path(os.getenv("DATA_GEOJSON", "static/data/access-points.geojson"))
 if not DATA_FILE.is_absolute():
     DATA_FILE = ROOT / DATA_FILE
@@ -49,7 +50,7 @@ async def index():
 
 @app.get("/api/config")
 async def config():
-    return {"google_enabled": bool(API_KEY), "origin": ORIGIN}
+    return {"google_enabled": bool(API_KEY), "landsd_3d_enabled": bool(LANDSD_3D_API_KEY), "origin": ORIGIN}
 
 
 @app.get("/api/access-points")
@@ -103,6 +104,44 @@ async def google_3d_tiles(tile_path: str, request: Request):
                 for item in value:
                     proxy_tile_uris(item)
 
+        proxy_tile_uris(document)
+        content = json.dumps(document, separators=(",", ":")).encode("utf-8")
+    return Response(content, media_type=content_type)
+
+
+@app.get("/api/landsd-3d-tiles/{tile_path:path}")
+async def landsd_3d_tiles(tile_path: str, request: Request):
+    """Proxy official Lands Department Cesium 3D tiles without exposing the key in the browser."""
+    if not LANDSD_3D_API_KEY:
+        raise HTTPException(503, "Lands Department 3D map key is not configured")
+    if not tile_path.startswith("f2/") or ".." in Path(tile_path).parts:
+        raise HTTPException(404, "Unknown Lands Department 3D tiles resource")
+    upstream = f"https://data.map.gov.hk/api/3d-data/3dtiles/{tile_path}"
+    params = dict(request.query_params)
+    params["key"] = LANDSD_3D_API_KEY
+    async with httpx.AsyncClient(timeout=45, follow_redirects=True) as client:
+        response = await client.get(upstream, params=params)
+    if response.is_error:
+        raise HTTPException(response.status_code, "Lands Department 3D map request failed")
+    from fastapi.responses import Response
+    content_type = response.headers.get("content-type", "application/octet-stream")
+    content = response.content
+    if "json" in content_type:
+        document = response.json()
+        def proxy_tile_uris(value):
+            if isinstance(value, dict):
+                for key, item in value.items():
+                    if key in {"uri", "url", "template"} and isinstance(item, str):
+                        absolute = urljoin(upstream, item)
+                        parsed = urlsplit(absolute)
+                        if parsed.hostname == "data.map.gov.hk" and "/api/3d-data/3dtiles/f2/" in parsed.path:
+                            tile = parsed.path.split("/api/3d-data/3dtiles/", 1)[1]
+                            value[key] = urlunsplit(("", "", "/api/landsd-3d-tiles/" + tile, parsed.query, parsed.fragment))
+                    else:
+                        proxy_tile_uris(item)
+            elif isinstance(value, list):
+                for item in value:
+                    proxy_tile_uris(item)
         proxy_tile_uris(document)
         content = json.dumps(document, separators=(",", ":")).encode("utf-8")
     return Response(content, media_type=content_type)

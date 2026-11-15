@@ -9,7 +9,9 @@ services:
     envVars:
       - key: GOOGLE_MAPS_API_KEY
         sync: false
+      - key: LANDSD_3D_MAP_API_KEY
+        sync: false
       - key: ORIGIN_LAT
-        value: "22.2833"
+        value: "22.2855625"
       - key: ORIGIN_LNG
-        value: "114.1285"
+        value: "114.1347709"
