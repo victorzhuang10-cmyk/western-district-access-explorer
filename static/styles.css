@@ -61,6 +61,7 @@
 .style-option.selected{background:#fffefa;border-color:#dddcd2;color:#30382f;box-shadow:0 1px 3px #26352b14}
 .profile-option{display:block;width:100%;margin-top:7px;padding:6px 2px;border:0;background:none;text-align:left;color:#56715f;font:500 10px var(--ui);cursor:pointer}
 .profile-option:hover{text-decoration:underline}
+.candidate-extent{margin:8px 0 5px;color:#777d73;font:9px/1.35 var(--mono);letter-spacing:.02em}
 .diagram-mode #map-route-overlay .map-route-casing{stroke:#fff}
 .diagram-mode #map-route-overlay .map-route-line{stroke-width:5.5;filter:none}
 .reach-mode #walk-buffer-fill{fill-opacity:.3}

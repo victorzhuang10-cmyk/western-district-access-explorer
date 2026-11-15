@@ -21,6 +21,8 @@ function updateSliderPaint(input) {
   const color = input.id === 'distance' ? 'var(--rust)' : 'var(--pine)';
   input.style.background = `linear-gradient(to right,${color} 0%,${color} ${pct}%,#dcded5 ${pct}%,#dcded5 100%)`;
 }
+function candidateDistanceLimit() { return Math.min(4000, state.distanceMetres * 2); }
+function candidatePlaces() { const limit = candidateDistanceLimit(); return state.places.filter(p => Number(p.study_distance_m) <= limit); }
 function setRange() {
   state.distanceMetres = Number($('distance').value); state.walkTimeSeconds = state.distanceMetres; state.slope = Number($('slope').value); state.isochrone = null;
   $('distance-value').textContent = state.distanceMetres; $('slope-value').textContent = state.slope;
@@ -32,7 +34,8 @@ function setRange() {
   else { renderMapLibreOverlays(); scheduleLandsDAnalysis(); }
 }
 function renderList() {
-  const visible = state.places.filter(p => state.filter === 'all' || p.kind === state.filter);
+  const candidates = candidatePlaces();
+  const visible = candidates.filter(p => state.filter === 'all' || p.kind === state.filter);
   $('place-list').innerHTML = visible.map(p => {
     const [label, cls] = status(p);
     const icon = p.kind === 'green' ? '♧' : '✳';
@@ -43,10 +46,11 @@ function renderList() {
       : `CSDI location · ${formatDistance(p.study_distance_m)} study distance`;
     return `<div class="place-item ${accessible(p) ? 'is-accessible' : ''}" data-id="${escapeHtml(p.id)}"><span class="place-icon ${p.kind}">${icon}</span><span class="place-info"><strong>${escapeHtml(p.name)}</strong><small>${escapeHtml(extra)}</small></span><span class="place-status ${cls}">${escapeHtml(label)}</span></div>`;
   }).join('');
-  $('place-total').textContent = String(state.places.length).padStart(2, '0');
-  $('all-count').textContent = String(state.places.length).padStart(2, '0');
-  $('green-count').textContent = String(state.places.filter(p => p.kind === 'green').length).padStart(2, '0');
-  $('gym-count').textContent = String(state.places.filter(p => p.kind === 'gym').length).padStart(2, '0');
+  $('place-total').textContent = String(candidates.length).padStart(2, '0');
+  $('all-count').textContent = String(candidates.length).padStart(2, '0');
+  $('green-count').textContent = String(candidates.filter(p => p.kind === 'green').length).padStart(2, '0');
+  $('gym-count').textContent = String(candidates.filter(p => p.kind === 'gym').length).padStart(2, '0');
+  $('candidate-extent').textContent = `Nearby seed points · within ${formatDistance(candidateDistanceLimit())} straight-line · routes decide reach`;
   document.querySelectorAll('.place-item').forEach(el => el.addEventListener('click', () => focusPlace(el.dataset.id)));
 }
 function linePath(p) {
@@ -466,7 +470,7 @@ async function runGoogleAnalysis(version) {
   if (!state.google) return;
   const controller = new AbortController();
   state.googleController = controller;
-  const destinations = state.places.map(p => ({ id: p.id, name: p.name, kind: p.kind, latitude: p.coordinates[1], longitude: p.coordinates[0] }));
+  const destinations = candidatePlaces().map(p => ({ id: p.id, name: p.name, kind: p.kind, latitude: p.coordinates[1], longitude: p.coordinates[0] }));
   try {
     const request = { origin: { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude }, destinations, walk_time_seconds: state.walkTimeSeconds, max_slope_deg: state.slope };
     const [response, reachResponse] = await Promise.all([
@@ -478,7 +482,12 @@ async function runGoogleAnalysis(version) {
     const payload = await response.json();
     const reach = reachResponse.ok ? await reachResponse.json() : null;
     if (version !== state.googleAnalysisVersion) return;
-    state.places = payload.results.map(result => ({ ...state.places.find(p => p.id === result.id), ...result, routeAnalysis: true, googleAnalysis: true, route_source: 'Google Routes + Elevation API', coordinates: result.path?.length ? [result.path.at(-1)[0], result.path.at(-1)[1]] : state.places.find(p => p.id === result.id)?.coordinates }));
+    const byId = new Map(payload.results.map(result => [result.id, result]));
+    state.places = state.places.map(place => {
+      const result = byId.get(place.id);
+      if (!result) return { ...place, routeAnalysis: false, routeError: false, accessible: undefined, path: undefined };
+      return { ...place, ...result, routeAnalysis: true, googleAnalysis: true, route_source: 'Google Routes + Elevation API', coordinates: result.path?.length ? [result.path.at(-1)[0], result.path.at(-1)[1]] : place.coordinates };
+    });
     state.isochrone = reach?.feature || null;
     $('data-status').textContent = 'GOOGLE WALKING REACH · ROUTES + ELEVATION'; render();
   } catch (error) {

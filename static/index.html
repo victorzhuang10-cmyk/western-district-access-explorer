@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
   <link href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=reach-cut-21" />
+  <link rel="stylesheet" href="./styles.css?v=nearby-seed-02" />
 </head>
 <body>
   <header class="topbar">
@@ -55,6 +55,7 @@
       <section class="places-section">
         <div class="section-kicker"><span class="step-no">03</span><span>PLACES TO EXPLORE</span><span class="place-total" id="place-total">00</span></div>
         <div class="place-filters"><button class="filter active" data-filter="all"><span>All places</span><span id="all-count">00</span></button><button class="filter" data-filter="green"><span><i class="filter-dot green"></i>Green space</span><span id="green-count">00</span></button><button class="filter" data-filter="gym"><span><i class="filter-dot gym"></i>Outdoor fitness</span><span id="gym-count">00</span></button></div>
+        <div class="candidate-extent" id="candidate-extent">Nearby seed points · routes decide reach</div>
         <div class="place-list" id="place-list"></div>
       </section>
 
@@ -95,6 +96,6 @@
 
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Cesium.js"></script>
   <script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.2/dist/maplibre-gl.js'"></script>
-  <script src="./app.js?v=launch-reach-01"></script>
+  <script src="./app.js?v=nearby-seed-02"></script>
 </body>
 </html>
