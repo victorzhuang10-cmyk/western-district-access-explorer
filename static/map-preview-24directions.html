@@ -45,7 +45,7 @@
         <div class="time-chip"><span class="clock-icon">◷</span><span><b id="walk-time">5 min</b> routed-time limit</span></div>
 
         <div class="slope-block">
-          <div class="range-title"><div><strong>Maximum route slope</strong><small>Steepest sampled segment</small></div><div class="range-value slope-value"><b id="slope-value">10</b><span>°</span></div></div>
+          <div class="range-title"><div><strong>Maximum route slope</strong><small>Steepest sampled segment</small></div><div class="range-value slope-value"><b id="slope-value">15</b><span>°</span></div></div>
           <input id="slope" class="range range-slope" type="range" min="3" max="20" step="1" value="15" aria-label="Maximum allowed slope in degrees" />
           <div class="range-scale"><span>Gentler · 3°</span><span>Steeper · 20°</span></div>
           <div class="slope-legend"><span><i class="legend-dot accessible"></i>Within limit</span><span><i class="legend-dot steep"></i>Too steep</span></div>
@@ -73,11 +73,11 @@
 
       <div id="section-panel" class="section-panel" aria-label="3D elevation section" hidden></div>
       <div class="view-switcher" aria-label="Map presentation">
-        <div class="switch-copy"><span>MAP PRESENTATION</span><small id="presentation-title">3D massing · detailed</small></div>
+        <div class="switch-copy"><span>MAP PRESENTATION</span><small id="presentation-title">3D reach · detailed</small></div>
         <div class="presentation-tabs" role="group" aria-label="Choose map type">
           <button class="view-option" data-view="map" aria-pressed="false"><b>2D MAP</b></button>
-          <button class="view-option selected" data-view="massing" aria-pressed="true"><b>3D MASSING</b></button>
-          <button class="view-option" data-view="reach" aria-pressed="false"><b>3D REACH</b></button>
+          <button class="view-option" data-view="massing" aria-pressed="false"><b>3D MASSING</b></button>
+          <button class="view-option selected" data-view="reach" aria-pressed="true"><b>3D REACH</b></button>
         </div>
         <div class="style-tabs" role="group" aria-label="Map detail style"><button class="style-option selected" data-style="detailed" aria-pressed="true">Detailed</button><button class="style-option" data-style="diagram" aria-pressed="false">Diagram</button></div>
         <button class="profile-option" data-view="section">Open route elevation profile ↗</button>
@@ -95,6 +95,6 @@
 
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Cesium.js"></script>
   <script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.2/dist/maplibre-gl.js'"></script>
-  <script src="./app.js?v=reach-cut-21"></script>
+  <script src="./app.js?v=launch-reach-01"></script>
 </body>
 </html>
