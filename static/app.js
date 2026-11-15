@@ -3,7 +3,7 @@ const MAP_CENTER = { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude };
 const $ = (id) => document.getElementById(id);
 const apiUrl = (path) => new URL(`${location.pathname.includes('/static/') ? '../' : './'}api/${path}`, document.baseURI).toString();
 const staticUrl = (path) => new URL(`./${path}`, document.baseURI).toString();
-const state = { distanceMetres: 300, walkTimeSeconds: 300, slope: 10, filter: 'all', view: 'terrain', places: [], google: false, isochrone: null, boundarySamples: 0, sectionPlaceId: null, map: null, maplibre: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, routeFailures: new Set(), boundaryCache: new Map() };
+const state = { distanceMetres: 300, walkTimeSeconds: 300, slope: 10, filter: 'all', view: 'terrain', places: [], google: false, isochrone: null, boundarySamples: 0, sectionPlaceId: null, map: null, maplibre: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, googleAnalysisVersion: 0, googleController: null, routeFailures: new Set(), boundaryCache: new Map() };
 
 function formatDistance(m) { return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`; }
 function durationMinutes(p) { return p.duration_s != null ? p.duration_s / 60 : null; }
@@ -390,23 +390,37 @@ async function initGoogle() {
   } catch (error) { console.warn('Google backend unavailable; starting the open-data 3D view.', error); if (!state.map) initMapLibre(); scheduleLandsDAnalysis(); }
 }
 let requestTimer;
-function scheduleGoogleAnalysis() { clearTimeout(requestTimer); requestTimer = setTimeout(runGoogleAnalysis, 700); }
-async function runGoogleAnalysis() {
+function scheduleGoogleAnalysis() {
+  clearTimeout(requestTimer);
+  state.googleAnalysisVersion += 1;
+  if (state.googleController) { state.googleController.abort(); state.googleController = null; }
+  requestTimer = setTimeout(() => runGoogleAnalysis(state.googleAnalysisVersion), 700);
+}
+async function runGoogleAnalysis(version) {
   if (!state.google) return;
+  const controller = new AbortController();
+  state.googleController = controller;
   const destinations = state.places.map(p => ({ id: p.id, name: p.name, kind: p.kind, latitude: p.coordinates[1], longitude: p.coordinates[0] }));
   try {
     const request = { origin: { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude }, destinations, walk_time_seconds: state.walkTimeSeconds, max_slope_deg: state.slope };
     const [response, reachResponse] = await Promise.all([
-      fetch(apiUrl('analyze'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request) }),
-      fetch(apiUrl('isochrone'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request) }),
+      fetch(apiUrl('analyze'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request), signal: controller.signal }),
+      fetch(apiUrl('isochrone'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request), signal: controller.signal }),
     ]);
+    if (version !== state.googleAnalysisVersion) return;
     if (!response.ok) throw new Error(await response.text());
     const payload = await response.json();
     const reach = reachResponse.ok ? await reachResponse.json() : null;
+    if (version !== state.googleAnalysisVersion) return;
     state.places = payload.results.map(result => ({ ...state.places.find(p => p.id === result.id), ...result, routeAnalysis: true, googleAnalysis: true, route_source: 'Google Routes + Elevation API', coordinates: result.path?.length ? [result.path.at(-1)[0], result.path.at(-1)[1]] : state.places.find(p => p.id === result.id)?.coordinates }));
     state.isochrone = reach?.feature || null;
     $('data-status').textContent = 'GOOGLE WALKING REACH · ROUTES + ELEVATION'; render();
-  } catch (error) { $('data-status').textContent = 'GOOGLE ROUTING UNAVAILABLE'; console.warn('Google route analysis failed.', error); }
+  } catch (error) {
+    if (version !== state.googleAnalysisVersion || error.name === 'AbortError') return;
+    $('data-status').textContent = 'GOOGLE ROUTING UNAVAILABLE'; console.warn('Google route analysis failed.', error);
+  } finally {
+    if (state.googleController === controller) state.googleController = null;
+  }
 }
 
 $('distance').addEventListener('input', setRange); $('slope').addEventListener('input', setRange);
