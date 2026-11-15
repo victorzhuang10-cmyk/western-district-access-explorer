@@ -446,21 +446,33 @@ async function buildLandsDContour(origin, originVersion) {
       const spoke = nextSpoke++;
       if (spoke >= sampleCount || originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope) return;
       $('data-status').textContent = `TRACING WALK REACH · ${completedSpokes}/${sampleCount} DIRECTIONS`;
-      const routeKey = `${originVersion}/${spoke}`;
-      let requestRoute = false;
+      const candidateRadii = [3200, 1600, 800, 400, 200, 100];
+      let sampledReach = null, shortestUsefulReach = Math.min(120, Math.max(60, distanceMetres * .35));
       try {
-        let route = state.boundaryRouteCache.get(routeKey);
-        requestRoute = route === undefined;
-        if (requestRoute) {
-          const coordinates = radialDestination(origin, 3200, spoke * bearingStep);
-          route = await landsDRoute({ id: `buffer-${spoke}`, name: 'Walking-time boundary sample', coordinates }, origin);
-          state.boundaryRouteCache.set(routeKey, route);
+        for (const radius of candidateRadii) {
+          if (originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope) return;
+          const routeKey = `${originVersion}/${spoke}/${radius}`;
+          let route = state.boundaryRouteCache.get(routeKey);
+          const requestRoute = route === undefined;
+          if (requestRoute) {
+            const coordinates = radialDestination(origin, radius, spoke * bearingStep);
+            route = await landsDRoute({ id: `buffer-${spoke}-${radius}`, name: 'Walking-time boundary sample', coordinates }, origin);
+            state.boundaryRouteCache.set(routeKey, route);
+          }
+          if (originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope) return;
+          if (route.route_exists && route.path?.length) {
+            const endpoint = accessiblePrefixEndpoint(route.path, distanceMetres * 1.6, maxSlope, route.duration_s, walkTimeSeconds);
+            if (endpoint) {
+              const reach = { bearing: spoke * bearingStep, coordinate: endpoint, originElevation: Number(route.path[0][2]) };
+              const radialReach = haversineMetres([origin.longitude, origin.latitude], endpoint);
+              const bestRadialReach = sampledReach ? haversineMetres([origin.longitude, origin.latitude], sampledReach.coordinate) : 0;
+              if (!sampledReach || radialReach > bestRadialReach) sampledReach = reach;
+              if (radialReach >= shortestUsefulReach) break;
+            }
+          }
+          if (requestRoute) await wait(180);
         }
-        if (originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope) return;
-        if (route.route_exists && route.path?.length) {
-          const endpoint = accessiblePrefixEndpoint(route.path, distanceMetres * 1.6, maxSlope, route.duration_s, walkTimeSeconds);
-          if (endpoint) boundary.push({ bearing: spoke * bearingStep, coordinate: endpoint, originElevation: Number(route.path[0][2]) });
-        }
+        if (sampledReach) boundary.push(sampledReach);
       } catch (error) { console.warn(`Walking-time boundary sample ${spoke + 1} unavailable.`, error); }
       completedSpokes += 1;
       $('data-status').textContent = `TRACING WALK REACH · ${completedSpokes}/${sampleCount} DIRECTIONS`;
@@ -471,7 +483,7 @@ async function buildLandsDContour(origin, originVersion) {
   if (state.google || originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope) return;
   state.boundarySamples = boundary.length;
   const geometry = boundary.length >= 2 ? sampledReachGeometry(boundary, sampleCount, origin) : null;
-  if (geometry) state.isochrone = { type: 'Feature', properties: { method: '24 sampled Lands Department 3D routes at 15-degree bearings; connected safe samples form reach sectors and isolated samples show their one-bearing cell. Unsampled or slope-blocked directions remain open. Travel time is apportioned along each route by length.', sample_count: boundary.length, requested_samples: sampleCount, walk_time_seconds: walkTimeSeconds, equivalent_distance_m: distanceMetres, max_slope_deg: maxSlope }, geometry };
+  if (geometry) state.isochrone = { type: 'Feature', properties: { method: '24 Lands Department 3D pedestrian-network bearings at 15-degree spacing with progressively closer targets when a long target is disconnected. Connected safe samples form reach sectors and isolated samples show their one-bearing cell. Unsampled or slope-blocked directions remain open. Travel time is apportioned along each route by length.', sample_count: boundary.length, requested_samples: sampleCount, walk_time_seconds: walkTimeSeconds, equivalent_distance_m: distanceMetres, max_slope_deg: maxSlope }, geometry };
   else state.isochrone = null;
   state.boundaryCache.set(cacheKey, state.isochrone);
   $('data-status').textContent = state.isochrone
