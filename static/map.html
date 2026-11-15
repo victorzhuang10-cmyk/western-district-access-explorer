@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
   <link href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=sampled-reach-03" />
+  <link rel="stylesheet" href="./styles.css?v=block-intersections-01" />
 </head>
 <body>
   <header class="topbar">
@@ -38,7 +38,7 @@
       </section>
 
       <section class="controls-section">
-        <div class="section-kicker"><span class="step-no">02</span><span>WALK-TIME REACH</span><span class="kicker-info" title="The filled boundary follows pedestrian routes within this walking-time budget. Slider metres are an equivalent at 1 m/s, not a circular radius.">?</span></div>
+        <div class="section-kicker"><span class="step-no">02</span><span>WALK-TIME REACH</span><span class="kicker-info" title="The sampled pedestrian reach area is approximate. In 3D Reach diagram mode, whole building footprints that touch it are highlighted as candidate accessible blocks.">?</span></div>
         <div class="range-title"><div><strong>Walking-time budget</strong><small>Equivalent distance at a 1 m/s pace</small></div><div class="range-value"><b id="distance-value">300</b><span>m eq.</span></div></div>
         <input id="distance" class="range range-distance" type="range" min="100" max="2000" step="50" value="300" aria-label="Walking-time budget, shown as equivalent metres at one metre per second" />
         <div class="range-scale"><span>100 m</span><span>2 km</span></div>
@@ -78,7 +78,7 @@
       <div id="reach-legend" class="reach-legend" aria-live="polite">
         <div class="reach-legend-title"><i></i><b>ROUTED WALKING-TIME BUFFER</b></div>
         <p id="reach-boundary-status">Waiting for walking-route samples</p>
-        <div class="reach-legend-items"><span><i class="legend-area"></i>Reachable area</span><span><i class="legend-route"></i>Accessible route</span><span><i class="legend-origin"></i>Centre</span></div>
+        <div class="reach-legend-items"><span><i class="legend-area"></i><span id="reach-area-label">Reachable area</span></span><span><i class="legend-route"></i>Accessible route</span><span><i class="legend-origin"></i>Centre</span></div>
       </div>
 
       <div id="section-panel" class="section-panel" aria-label="3D elevation section" hidden></div>
@@ -102,10 +102,10 @@
     </section>
   </main>
 
-  <dialog id="about-dialog"><button class="dialog-close" aria-label="Close">×</button><div class="eyebrow">FIELDNOTES / METHOD</div><h2>Access, measured<br/><em>by the walk.</em></h2><p>The 100 m–2 km slider is a walking-time budget at a 1 m/s reference pace (for example, 300 m = 5 minutes). There is no official buffer polygon in the map data. For this public preview, the app requests 3D pedestrian routes from the centre toward 24 points on bearings 15° apart. It trims each sampled route at the walk-time limit or where a grade limit is exceeded, then connects the reached endpoints into an estimated area. This is a sampled estimate, not a full pedestrian-network isochrone.</p><p>The public preview uses the Lands Department 3D Pedestrian Route service for route geometry, walking time, and elevation samples; it does not require Google Maps billing. If a sampled direction fails, it remains a gap. Destination routes are calculated separately, so a displayed accepted route can extend outside this coarse 24-direction polygon. Open-space records are points rather than park parcel boundaries, so the shaded area clips locations, not whole parks. Steps, kerbs, surfaces, crossing safety, step-free entrances, equipment condition, and opening hours need field checks.</p><a href="https://data.gov.hk/en-data/dataset/hk-lcsd-facility-facility-ofe" target="_blank" rel="noreferrer">Outdoor Fitness Equipment · DATA.GOV.HK ↗</a><a href="https://data.gov.hk/en-data/dataset/hk-landsd-openmap-public-open-space" target="_blank" rel="noreferrer">Public Open Space · Lands Department ↗</a><div class="dialog-credit">3D PEDESTRIAN ROUTES: LAND DEPARTMENT · CSDI<br/>TEXTURED 3D TILES: LANDSD WHEN CONFIGURED · OSM MASSING FALLBACK<br/>SPATIAL PREPARATION: GEOPANDAS · EPSG:2326</div></dialog>
+  <dialog id="about-dialog"><button class="dialog-close" aria-label="Close">×</button><div class="eyebrow">FIELDNOTES / METHOD</div><h2>Access, measured<br/><em>by the walk.</em></h2><p>The 100 m–2 km slider is a walking-time budget at a 1 m/s reference pace (for example, 300 m = 5 minutes). There is no official buffer polygon in the map data. The app estimates one from 24 Lands Department 3D pedestrian routes toward targets at 15° intervals, cutting each route at its time or grade limit and joining the reached endpoints.</p><p>In 3D Reach’s carved diagram, the app hides the broad filled area and highlights complete OpenFreeMap building footprints whenever any part of a footprint intersects the sampled reach polygon. This makes edge blocks visible, but footprint intersection is only a candidate: it does not confirm that a building entrance connects to the reachable path or that the building is publicly accessible. Destination routes are still calculated separately, and the 24-direction boundary remains approximate.</p><a href="https://data.gov.hk/en-data/dataset/hk-lcsd-facility-facility-ofe" target="_blank" rel="noreferrer">Outdoor Fitness Equipment · DATA.GOV.HK ↗</a><a href="https://data.gov.hk/en-data/dataset/hk-landsd-openmap-public-open-space" target="_blank" rel="noreferrer">Public Open Space · Lands Department ↗</a><div class="dialog-credit">3D PEDESTRIAN ROUTES: LAND DEPARTMENT · CSDI<br/>TEXTURED 3D TILES: LANDSD WHEN CONFIGURED · OSM MASSING FALLBACK<br/>SPATIAL PREPARATION: GEOPANDAS · EPSG:2326</div></dialog>
 
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.147/Build/Cesium/Cesium.js"></script>
   <script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.2/dist/maplibre-gl.js'"></script>
-  <script src="./app.js?v=sampled-reach-03"></script>
+  <script src="./app.js?v=block-intersections-01"></script>
 </body>
 </html>

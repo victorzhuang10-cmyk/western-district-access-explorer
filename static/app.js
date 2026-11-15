@@ -3,7 +3,7 @@ const MAP_CENTER = { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude };
 const $ = (id) => document.getElementById(id);
 const apiUrl = (path) => new URL(`${location.pathname.includes('/static/') ? '../' : './'}api/${path}`, document.baseURI).toString();
 const staticUrl = (path) => new URL(`./${path}`, document.baseURI).toString();
-const state = { distanceMetres: 300, walkTimeSeconds: 300, slope: 30, stepSlope: 15, filter: 'all', view: 'map', mapStyle: 'detailed', massingStyle: 'diagram', reachStyle: 'diagram', places: [], google: false, isochrone: null, boundarySamples: 0, sectionPlaceId: null, map: null, maplibre: null, mapBasePaint: new Map(), tileset: null, clippingSignature: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, googleAnalysisVersion: 0, googleController: null, routeFailures: new Set(), boundaryCache: new Map(), boundaryRouteCache: new Map() };
+const state = { distanceMetres: 300, walkTimeSeconds: 300, slope: 30, stepSlope: 15, filter: 'all', view: 'map', mapStyle: 'detailed', massingStyle: 'diagram', reachStyle: 'diagram', places: [], google: false, isochrone: null, boundarySamples: 0, sectionPlaceId: null, map: null, maplibre: null, mapBasePaint: new Map(), tileset: null, clippingSignature: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, googleAnalysisVersion: 0, googleController: null, routeFailures: new Set(), boundaryCache: new Map(), boundaryRouteCache: new Map(), reachBlocksSignature: null };
 
 function formatDistance(m) { return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`; }
 function durationMinutes(p) { return p.duration_s != null ? p.duration_s / 60 : null; }
@@ -154,6 +154,7 @@ function applyPresentation() {
   shell.classList.toggle('diagram-mode', style === 'diagram');
   shell.classList.toggle('reach-mode', view === 'reach');
   if ($('reach-legend')) $('reach-legend').hidden = view === 'massing';
+  if ($('reach-area-label')) $('reach-area-label').textContent = view === 'reach' && style === 'diagram' ? 'Reachable building blocks' : 'Reachable area';
   const presentationName = view === 'map' ? '2D City' : view === 'massing' ? '3D City' : '3D Reach';
   const styleName = view === 'map' ? (style === 'detailed' ? 'Colored street map' : 'Simplified route diagram')
     : view === 'massing' ? (style === 'detailed' ? 'Textured 3D city' : 'Building massing + routes')
@@ -178,8 +179,13 @@ function applyPresentation() {
         map.setLayoutProperty(layer.id, 'visibility', view === 'reach' && style === 'diagram' ? 'visible' : 'none');
         map.setPaintProperty(layer.id, 'fill-color', '#f6f6f2');
         map.setPaintProperty(layer.id, 'fill-opacity', .84);
+      } else if (layer.id === 'reach-block-buildings') {
+        map.setLayoutProperty(layer.id, 'visibility', view === 'reach' && style === 'diagram' ? 'visible' : 'none');
+        map.setPaintProperty(layer.id, 'fill-extrusion-color', '#bed8c7');
+        map.setPaintProperty(layer.id, 'fill-extrusion-opacity', .98);
       } else if (layer.id.startsWith('walk-buffer-')) {
-        map.setLayoutProperty(layer.id, 'visibility', view === 'reach' || view === 'map' ? 'visible' : 'none');
+        const showGroundFill = !(view === 'reach' && style === 'diagram' && layer.id === 'walk-buffer-fill');
+        map.setLayoutProperty(layer.id, 'visibility', (view === 'reach' || view === 'map') && showGroundFill ? 'visible' : 'none');
         if (layer.id === 'walk-buffer-fill') {
           map.setPaintProperty(layer.id, 'fill-color', style === 'diagram' ? '#b9ddc8' : '#7eb297');
           map.setPaintProperty(layer.id, 'fill-opacity', style === 'diagram' ? .62 : .35);
@@ -342,6 +348,7 @@ function renderMapLibreOverlays() {
   const maskData = { type: 'FeatureCollection', features: reachMask ? [reachMask] : [] };
   const originData = { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { name: 'Western District Elderly Community Centre' }, geometry: { type: 'Point', coordinates: [ORIGIN.longitude, ORIGIN.latitude] } }] };
   map.getSource('access-routes')?.setData(routeData); map.getSource('access-places')?.setData(placeData); map.getSource('walk-buffer')?.setData(bufferData); map.getSource('reach-mask')?.setData(maskData); map.getSource('map-origin')?.setData(originData);
+  scheduleReachBuildingUpdate();
   if (map.getLayer('reach-mask-fill') && map.getLayer('3d-buildings-context')) map.moveLayer('reach-mask-fill', '3d-buildings-context');
   const boundaryText = $('reach-boundary-status');
   if (boundaryText) boundaryText.textContent = state.isochrone
@@ -350,6 +357,73 @@ function renderMapLibreOverlays() {
   renderMapLibreSvgRoutes();
 }
 function escapeHtml(value) { return String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
+function polygonParts(geometry) {
+  if (geometry?.type === 'Polygon') return [geometry.coordinates];
+  if (geometry?.type === 'MultiPolygon') return geometry.coordinates;
+  return [];
+}
+function pointInRing(point, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i], b = ring[j];
+    if ((a[1] > point[1]) !== (b[1] > point[1]) && point[0] < (b[0] - a[0]) * (point[1] - a[1]) / ((b[1] - a[1]) || Number.EPSILON) + a[0]) inside = !inside;
+  }
+  return inside;
+}
+function pointInPolygon(point, polygon) {
+  return Boolean(polygon?.[0]?.length && pointInRing(point, polygon[0]) && !polygon.slice(1).some(hole => pointInRing(point, hole)));
+}
+function segmentsCross(a, b, c, d) {
+  const cross = (p, q, r) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+  const onSegment = (p, q, r) => r[0] >= Math.min(p[0], q[0]) - 1e-10 && r[0] <= Math.max(p[0], q[0]) + 1e-10 && r[1] >= Math.min(p[1], q[1]) - 1e-10 && r[1] <= Math.max(p[1], q[1]) + 1e-10;
+  const abC = cross(a, b, c), abD = cross(a, b, d), cdA = cross(c, d, a), cdB = cross(c, d, b);
+  if (((abC > 0 && abD < 0) || (abC < 0 && abD > 0)) && ((cdA > 0 && cdB < 0) || (cdA < 0 && cdB > 0))) return true;
+  return (Math.abs(abC) < 1e-10 && onSegment(a, b, c)) || (Math.abs(abD) < 1e-10 && onSegment(a, b, d)) || (Math.abs(cdA) < 1e-10 && onSegment(c, d, a)) || (Math.abs(cdB) < 1e-10 && onSegment(c, d, b));
+}
+function polygonsTouch(a, b) {
+  if (!a?.[0]?.length || !b?.[0]?.length) return false;
+  const ar = a[0], br = b[0];
+  if (ar.some(point => pointInPolygon(point, b)) || br.some(point => pointInPolygon(point, a))) return true;
+  for (let i = 0; i < ar.length - 1; i += 1) for (let j = 0; j < br.length - 1; j += 1) {
+    if (segmentsCross(ar[i], ar[i + 1], br[j], br[j + 1])) return true;
+  }
+  return false;
+}
+function geometriesTouch(a, b) {
+  return polygonParts(a).some(first => polygonParts(b).some(second => polygonsTouch(first, second)));
+}
+let reachBlockUpdateTimer;
+function scheduleReachBuildingUpdate() {
+  clearTimeout(reachBlockUpdateTimer);
+  reachBlockUpdateTimer = setTimeout(updateReachBuildingBlocks, 120);
+}
+function updateReachBuildingBlocks() {
+  const map = state.maplibre, source = map?.getSource('reach-block-buildings');
+  if (!source) return;
+  const geometry = state.isochrone?.geometry;
+  if (!(state.view === 'reach' && state.reachStyle === 'diagram') || !['Polygon', 'MultiPolygon'].includes(geometry?.type)) {
+    if (state.reachBlocksSignature !== 'off') { source.setData({ type: 'FeatureCollection', features: [] }); state.reachBlocksSignature = 'off'; }
+    return;
+  }
+  let tiles = [];
+  try { tiles = map.querySourceFeatures('openfreemap', { sourceLayer: 'building', filter: ['!=', ['get', 'hide_3d'], true] }); }
+  catch (error) { console.warn('OpenFreeMap building footprints are not ready.', error); }
+  const seen = new Set();
+  const selected = tiles.filter(feature => {
+    if (!feature.geometry || !geometriesTouch(feature.geometry, geometry)) return false;
+    const key = JSON.stringify(feature.geometry.coordinates);
+    if (seen.has(key)) return false;
+    seen.add(key); return true;
+  }).map(feature => ({
+    type: 'Feature',
+    properties: { render_height: Number(feature.properties?.render_height) || 15, render_min_height: Number(feature.properties?.render_min_height) || 0 },
+    geometry: feature.geometry,
+  }));
+  const signature = `${state.originVersion}/${state.distanceMetres}/${state.slope}/${state.stepSlope}/${selected.length}/${[...seen].join('|')}`;
+  if (signature === state.reachBlocksSignature) return;
+  source.setData({ type: 'FeatureCollection', features: selected });
+  state.reachBlocksSignature = signature;
+}
 function haversineMetres(a, b) {
   const rad = Math.PI / 180, phi1 = a[1] * rad, phi2 = b[1] * rad;
   const dPhi = (b[1] - a[1]) * rad, dLambda = (b[0] - a[0]) * rad;
@@ -565,7 +639,9 @@ function addMapLibreLayers(map) {
   map.addSource('access-routes', { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, lineMetrics: true });
   map.addSource('access-places', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addSource('map-origin', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addSource('reach-block-buildings', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addLayer({ id: 'reach-mask-fill', type: 'fill', source: 'reach-mask', paint: { 'fill-color': '#f3f4ed', 'fill-opacity': .78 } });
+  map.addLayer({ id: 'reach-block-buildings', type: 'fill-extrusion', source: 'reach-block-buildings', layout: { visibility: 'none' }, paint: { 'fill-extrusion-color': '#bed8c7', 'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 15], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0], 'fill-extrusion-opacity': .98 } });
   map.addLayer({ id: 'walk-buffer-fill', type: 'fill', source: 'walk-buffer', paint: { 'fill-color': '#cb634c', 'fill-opacity': .24 } });
   map.addLayer({ id: 'walk-buffer-outline', type: 'line', source: 'walk-buffer', paint: { 'line-color': '#c85d45', 'line-width': 2.5, 'line-dasharray': [2, 2], 'line-opacity': .95 } });
   map.addLayer({ id: 'accessible-route-casing', type: 'line', source: 'access-routes', paint: { 'line-color': '#fffdf6', 'line-width': 9, 'line-opacity': .96 } });
@@ -585,7 +661,7 @@ function addMapLibreLayers(map) {
     showToast(state.google ? 'Origin updated. Recalculating walking reach.' : 'Origin moved. Recalculating Lands Department walking routes.');
     if (state.google) scheduleGoogleAnalysis(); else scheduleLandsDAnalysis();
   });
-  map.on('move', renderMapLibreSvgRoutes); map.on('resize', renderMapLibreSvgRoutes); map.on('idle', renderMapLibreSvgRoutes);
+  map.on('move', renderMapLibreSvgRoutes); map.on('resize', renderMapLibreSvgRoutes); map.on('idle', () => { renderMapLibreSvgRoutes(); scheduleReachBuildingUpdate(); });
   renderMapLibreOverlays();
 }
 function initMapLibre() {
