@@ -75,3 +75,16 @@
 .map-loading-error .loading-spinner{display:none}
 @keyframes map-spin{to{transform:rotate(360deg)}}
 @media(max-width:760px){.map-loading{font-size:11px;padding:13px 16px}}
+/* Let the 3D map lead on tablets instead of squeezing it beside a narrow sidebar. */
+@media (min-width: 761px) and (max-width: 980px) {
+  html, body { overflow: auto; }
+  .layout { height: auto; min-height: calc(100% - 72px); display: flex; flex-direction: column; }
+  .map-shell { order: 0; width: 100%; height: min(70vh, 720px); min-height: 480px; }
+  .sidebar { order: 1; width: 100%; height: auto; overflow: visible; padding: 28px clamp(24px, 7vw, 72px) 24px; }
+  .intro-copy { max-width: 520px; }
+  .origin-card, .controls-section, .places-section, .sidebar-footer { max-width: 620px; }
+  .map-topline { left: 20px; right: 18px; }
+  .map-live { max-width: 240px; font-size: 8px; }
+  .map-caption { left: 18px; bottom: 18px; }
+  .view-switcher { right: 18px; bottom: 18px; width: 264px; }
+}
