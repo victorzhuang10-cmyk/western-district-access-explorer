@@ -156,7 +156,7 @@ function applyPresentation() {
   shell.classList.toggle('diagram-mode', style === 'diagram');
   shell.classList.toggle('reach-mode', view === 'reach');
   if ($('reach-legend')) $('reach-legend').hidden = view === 'massing';
-  if ($('reach-area-label')) $('reach-area-label').textContent = view === 'reach' && style === 'diagram' ? 'Reachable building blocks' : 'Reachable area';
+  if ($('reach-area-label')) $('reach-area-label').textContent = view === 'reach' && style === 'diagram' ? 'Snapped buffer + buildings' : 'Reachable area';
   const presentationName = view === 'map' ? '2D City' : view === 'massing' ? '3D City' : '3D Reach';
   const styleName = view === 'map' ? (style === 'detailed' ? 'Colored street map' : 'Simplified route diagram')
     : view === 'massing' ? (style === 'detailed' ? 'Textured 3D city' : 'Building massing + routes')
