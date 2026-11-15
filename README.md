@@ -4,7 +4,7 @@ An interactive 3D walking-accessibility prototype for public green space and out
 
 ## Open the site
 
-- Public preview: <https://victorzhuang10-cmyk.github.io/western-district-access-explorer/map-preview-nearby-seed-02.html>
+- Public preview: <https://victorzhuang10-cmyk.github.io/western-district-access-explorer/map-preview-nearby-seed-02.html?v=tablet-split-01>
 - Public source repository: <https://github.com/victorzhuang10-cmyk/western-district-access-explorer>
 
 The preview opens at Hill Court, 28 Hill Road, Sai Ying Pun, using the Western District Elderly Community Centre listing in Google Maps and the operator address. Its six presentation states combine a detailed or diagram 2D street map, 3D building massing, and a 3D walking-reach cutaway. The 3D reach view masks the surrounding city and highlights the walking-time contour, origin, routes, and reachable green-space / outdoor-fitness locations. A route elevation profile is also available. The Pages preview uses OpenStreetMap/OpenFreeMap buildings and Hong Kong CSDI destination points, with Lands Department 3D Pedestrian Route times, paths, and elevation samples. When configured, the server can load Google Photorealistic 3D Tiles or the official Lands Department 3D Visualisation tiles. The 100 m–2 km slider is an equivalent walk-time budget at a 1 m/s reference pace (300 m = 5 minutes); route accessibility is screened by actual returned travel time and the 3–20° slope control. The no-key contour samples 24 real 3D routes and apportions each total route time by path length to estimate the boundary; it is a planning approximation, not a complete isochrone. Open-space source records are points, not park parcel boundaries.
