@@ -263,22 +263,10 @@ function renderCesiumOverlays() {
     const hierarchy = hasElevation
       ? Cesium.Cartesian3.fromDegreesArrayHeights(coordinates.flatMap(c => [c[0], c[1], Number(c[2])]))
       : Cesium.Cartesian3.fromDegreesArray(coordinates.flatMap(c => c.slice(0, 2)));
-    const polygon = { hierarchy, material: Cesium.Color.fromCssColorString('#73b58f').withAlpha(.58), outline: true, outlineColor: Cesium.Color.fromCssColorString('#276d5d').withAlpha(.98), outlineWidth: 3 };
+    const polygon = { hierarchy, material: Cesium.Color.fromCssColorString('#cb5237').withAlpha(.32), outline: true, outlineColor: Cesium.Color.fromCssColorString('#a94732').withAlpha(.98), outlineWidth: 3 };
     if (hasElevation) polygon.perPositionHeight = true;
     else polygon.height = 8;
     state.routeEntities.push(state.map.entities.add({ polygon }));
-  }
-  if (state.view === 'reach' || state.view === 'map') {
-    for (const feature of routeCorridorFeatures(state.places.filter(p => accessible(p) && (state.filter === 'all' || p.kind === state.filter)))) {
-      const coordinates = feature.geometry.coordinates[0];
-      const polygon = {
-        hierarchy: Cesium.Cartesian3.fromDegreesArray(coordinates.flatMap(c => c.slice(0, 2))),
-        material: Cesium.Color.fromCssColorString('#73b58f').withAlpha(.58),
-        outline: false,
-        height: 8,
-      };
-      state.routeEntities.push(state.map.entities.add({ polygon }));
-    }
   }
   for (const p of state.places) {
     if (!accessible(p) || !p.path?.length) continue;
@@ -339,8 +327,7 @@ function renderMapLibreOverlays() {
   });
   const routeData = { type: 'FeatureCollection', features: routes };
   const placeData = { type: 'FeatureCollection', features: places };
-  const routeBuffers = state.view === 'reach' || state.view === 'map' ? routeCorridorFeatures(inReach) : [];
-  const bufferData = { type: 'FeatureCollection', features: [...(state.isochrone ? [state.isochrone] : []), ...routeBuffers] };
+  const bufferData = { type: 'FeatureCollection', features: state.isochrone && (state.view === 'reach' || state.view === 'map') ? [state.isochrone] : [] };
   const extent = Array.from({length: 8}, (_, i) => radialDestination(ORIGIN, 12000, i * 45)); extent.push(extent[0]);
   const signedArea = ring => ring.slice(0, -1).reduce((area, point, i) => { const next = ring[i + 1]; return area + point[0] * next[1] - next[0] * point[1]; }, 0) / 2;
   if (signedArea(extent) < 0) extent.reverse();
@@ -358,42 +345,11 @@ function renderMapLibreOverlays() {
   if (map.getLayer('reach-mask-fill') && map.getLayer('3d-buildings-context')) map.moveLayer('reach-mask-fill', '3d-buildings-context');
   const boundaryText = $('reach-boundary-status');
   if (boundaryText) boundaryText.textContent = state.isochrone
-    ? `${state.isochrone.properties.sample_count}/${state.isochrone.properties.requested_samples} sampled directions pass the ${Math.round(state.walkTimeSeconds / 60)} min walk-time and grade limits. Accepted destinations add a 6 m buffer on either side of each accessible route.`
+    ? `${state.isochrone.properties.sample_count}/${state.isochrone.properties.requested_samples} sampled directions pass the ${Math.round(state.walkTimeSeconds / 60)} min walk-time, ${state.slope}° route-grade and ${state.stepSlope}° next-step limits.`
     : 'Waiting for walking-route samples';
   renderMapLibreSvgRoutes();
 }
 function escapeHtml(value) { return String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
-function routeCorridorFeatures(places, halfWidthMetres = 6) {
-  const latitudeScale = 111320, longitudeScale = latitudeScale * Math.cos(ORIGIN.latitude * Math.PI / 180);
-  return places.filter(place => place.path?.length > 1).map(place => {
-    const points = place.path.map(([longitude, latitude]) => [longitude * longitudeScale, latitude * latitudeScale]);
-    const startLength = Math.hypot(points[1][0] - points[0][0], points[1][1] - points[0][1]) || 1;
-    const endLength = Math.hypot(points.at(-1)[0] - points.at(-2)[0], points.at(-1)[1] - points.at(-2)[1]) || 1;
-    points[0] = [points[0][0] - (points[1][0] - points[0][0]) / startLength * halfWidthMetres, points[0][1] - (points[1][1] - points[0][1]) / startLength * halfWidthMetres];
-    points[points.length - 1] = [points.at(-1)[0] + (points.at(-1)[0] - points.at(-2)[0]) / endLength * halfWidthMetres, points.at(-1)[1] + (points.at(-1)[1] - points.at(-2)[1]) / endLength * halfWidthMetres];
-    const left = [], right = [];
-    for (let i = 0; i < points.length; i += 1) {
-      const previous = points[Math.max(0, i - 1)], next = points[Math.min(points.length - 1, i + 1)];
-      const dx = next[0] - previous[0], dy = next[1] - previous[1], length = Math.hypot(dx, dy) || 1;
-      const nx = -dy / length, ny = dx / length;
-      const prior = points[i - 1], following = points[i + 1];
-      let bend = 1;
-      if (prior && following) {
-        const prevLength = Math.hypot(points[i][0] - prior[0], points[i][1] - prior[1]) || 1;
-        const nextLength = Math.hypot(following[0] - points[i][0], following[1] - points[i][1]) || 1;
-        const prevNormal = [-(points[i][1] - prior[1]) / prevLength, (points[i][0] - prior[0]) / prevLength];
-        const nextNormal = [-(following[1] - points[i][1]) / nextLength, (following[0] - points[i][0]) / nextLength];
-        const avgLength = Math.hypot(prevNormal[0] + nextNormal[0], prevNormal[1] + nextNormal[1]) || 1;
-        bend = Math.max(.5, (nx * (prevNormal[0] + nextNormal[0]) + ny * (prevNormal[1] + nextNormal[1])) / avgLength);
-      }
-      const offset = Math.min(halfWidthMetres / bend, halfWidthMetres * 2);
-      left.push([points[i][0] + nx * offset, points[i][1] + ny * offset]);
-      right.push([points[i][0] - nx * offset, points[i][1] - ny * offset]);
-    }
-    const ring = [...left, ...right.reverse(), left[0]].map(([x, y]) => [x / longitudeScale, y / latitudeScale]);
-    return { type: 'Feature', properties: { id: place.id, name: place.name, buffer_part: 'accessible-route-corridor' }, geometry: { type: 'Polygon', coordinates: [ring] } };
-  });
-}
 function haversineMetres(a, b) {
   const rad = Math.PI / 180, phi1 = a[1] * rad, phi2 = b[1] * rad;
   const dPhi = (b[1] - a[1]) * rad, dLambda = (b[0] - a[0]) * rad;
@@ -583,12 +539,6 @@ function renderMapLibreSvgRoutes() {
     const d = screen.map((point, i) => `${i ? 'L' : 'M'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ') + ' Z';
     return `<path class="map-reach-buffer" d="${d}"/>`;
   }).join('');
-  const routeBufferMarkup = (state.view === 'reach' || state.view === 'map' ? routeCorridorFeatures(state.places.filter(p => accessible(p) && (state.filter === 'all' || p.kind === state.filter))) : []).map(feature => {
-    const screen = feature.geometry.coordinates[0].map(point => map.project(point));
-    if (screen.some(point => !Number.isFinite(point.x) || !Number.isFinite(point.y))) return '';
-    const d = screen.map((point, i) => `${i ? 'L' : 'M'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ') + ' Z';
-    return `<path class="map-reach-buffer map-route-reach-corridor" d="${d}"/>`;
-  }).join('');
   const markup = state.places.filter(p => accessible(p) && (state.filter === 'all' || p.kind === state.filter)).map(p => {
     if (!p.path?.length) return '';
     const path = p.path.map(c => c.slice(0, 2));
@@ -603,7 +553,7 @@ function renderMapLibreSvgRoutes() {
   const originMarkup = Number.isFinite(origin.x) && Number.isFinite(origin.y)
     ? `<circle class="map-route-origin-halo" cx="${origin.x.toFixed(1)}" cy="${origin.y.toFixed(1)}" r="12"/><circle class="map-route-origin-dot" cx="${origin.x.toFixed(1)}" cy="${origin.y.toFixed(1)}" r="7"/><text class="map-route-label map-origin-label" x="${(origin.x + 14).toFixed(1)}" y="${(origin.y - 11).toFixed(1)}">COMMUNITY CENTRE</text>`
     : '';
-  svg.innerHTML = `${bufferMarkup}${routeBufferMarkup}${markup}${originMarkup}`;
+  svg.innerHTML = `${bufferMarkup}${markup}${originMarkup}`;
 }
 function addMapLibreLayers(map) {
   for (const layer of map.getStyle().layers) state.mapBasePaint.set(layer.id, { fillColor: layer.paint?.['fill-color'], lineColor: layer.paint?.['line-color'], visibility: layer.layout?.visibility || 'visible' });
@@ -617,7 +567,7 @@ function addMapLibreLayers(map) {
   map.addSource('map-origin', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addLayer({ id: 'reach-mask-fill', type: 'fill', source: 'reach-mask', paint: { 'fill-color': '#f3f4ed', 'fill-opacity': .78 } });
   map.addLayer({ id: 'walk-buffer-fill', type: 'fill', source: 'walk-buffer', paint: { 'fill-color': '#cb634c', 'fill-opacity': .24 } });
-  map.addLayer({ id: 'walk-buffer-outline', type: 'line', source: 'walk-buffer', filter: ['!=', ['get', 'buffer_part'], 'accessible-route-corridor'], paint: { 'line-color': '#c85d45', 'line-width': 2.5, 'line-dasharray': [2, 2], 'line-opacity': .95 } });
+  map.addLayer({ id: 'walk-buffer-outline', type: 'line', source: 'walk-buffer', paint: { 'line-color': '#c85d45', 'line-width': 2.5, 'line-dasharray': [2, 2], 'line-opacity': .95 } });
   map.addLayer({ id: 'accessible-route-casing', type: 'line', source: 'access-routes', paint: { 'line-color': '#fffdf6', 'line-width': 9, 'line-opacity': .96 } });
   map.addLayer({ id: 'accessible-routes', type: 'line', source: 'access-routes', paint: { 'line-color': '#16755f', 'line-width': 5, 'line-opacity': 1 } });
   map.addLayer({ id: 'access-place-points', type: 'circle', source: 'access-places', paint: { 'circle-radius': 8, 'circle-color': ['match', ['get', 'kind'], 'gym', '#c89040', '#287461'], 'circle-stroke-color': '#f8f7f0', 'circle-stroke-width': 3 } });
