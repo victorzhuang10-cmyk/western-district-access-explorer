@@ -3,17 +3,20 @@ const MAP_CENTER = { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude };
 const $ = (id) => document.getElementById(id);
 const apiUrl = (path) => new URL(`${location.pathname.includes('/static/') ? '../' : './'}api/${path}`, document.baseURI).toString();
 const staticUrl = (path) => new URL(`./${path}`, document.baseURI).toString();
-const state = { distanceMetres: 300, walkTimeSeconds: 300, slope: 15, filter: 'all', view: 'map', mapStyle: 'detailed', massingStyle: 'diagram', reachStyle: 'diagram', places: [], google: false, isochrone: null, boundarySamples: 0, sectionPlaceId: null, map: null, maplibre: null, mapBasePaint: new Map(), tileset: null, clippingSignature: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, googleAnalysisVersion: 0, googleController: null, routeFailures: new Set(), boundaryCache: new Map(), boundaryRouteCache: new Map() };
+const state = { distanceMetres: 300, walkTimeSeconds: 300, slope: 30, stepSlope: 15, filter: 'all', view: 'map', mapStyle: 'detailed', massingStyle: 'diagram', reachStyle: 'diagram', places: [], google: false, isochrone: null, boundarySamples: 0, sectionPlaceId: null, map: null, maplibre: null, mapBasePaint: new Map(), tileset: null, clippingSignature: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, googleAnalysisVersion: 0, googleController: null, routeFailures: new Set(), boundaryCache: new Map(), boundaryRouteCache: new Map() };
 
 function formatDistance(m) { return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`; }
 function durationMinutes(p) { return p.duration_s != null ? p.duration_s / 60 : null; }
-function accessible(p) { return Boolean(p.routeAnalysis && p.route_exists !== false && Number(p.duration_s) <= state.walkTimeSeconds && Number(p.max_slope_deg) <= state.slope && p.accessible !== false); }
+function routeGrade(p) { return Number(p.route_grade_deg ?? 0); }
+function stepGrade(p) { return Number(p.max_step_slope_deg ?? p.max_slope_deg ?? 0); }
+function accessible(p) { return Boolean(p.routeAnalysis && p.route_exists !== false && Number(p.duration_s) <= state.walkTimeSeconds && routeGrade(p) <= state.slope && stepGrade(p) <= state.stepSlope && p.accessible !== false); }
 function status(p) {
   if (!p.routeAnalysis) return [p.routeError ? 'ROUTE UNAVAILABLE' : 'ROUTE PENDING', 'pending'];
   if (p.route_exists === false) return ['NO WALK ROUTE', 'outside'];
   if (p.accessible === false && !Number.isFinite(Number(p.duration_s))) return ['ROUTE UNAVAILABLE', 'pending'];
   if (Number(p.duration_s) > state.walkTimeSeconds) return ['OVER TIME', 'outside'];
-  if (Number(p.max_slope_deg || 0) > state.slope) return [`${Number(p.max_slope_deg).toFixed(1)}° SLOPE`, 'steep'];
+  if (routeGrade(p) > state.slope) return [`${routeGrade(p).toFixed(1)}° ROUTE GRADE`, 'steep'];
+  if (stepGrade(p) > state.stepSlope) return [`${stepGrade(p).toFixed(1)}° STEP GRADE`, 'steep'];
   return ['IN REACH', ''];
 }
 function updateSliderPaint(input) {
@@ -24,12 +27,14 @@ function updateSliderPaint(input) {
 function candidateDistanceLimit() { return Math.min(4000, state.distanceMetres * 2); }
 function candidatePlaces() { const limit = candidateDistanceLimit(); return state.places.filter(p => Number(p.study_distance_m) <= limit); }
 function setRange(analyze = true) {
-  state.distanceMetres = Number($('distance').value); state.walkTimeSeconds = state.distanceMetres; state.slope = Number($('slope').value);
-  $('distance-value').textContent = state.distanceMetres; $('slope-value').textContent = state.slope;
+  const nextDistance = Number($('distance').value), nextSlope = Number($('slope').value), nextStepSlope = Number($('step-slope').value);
+  if (nextDistance !== state.distanceMetres || nextSlope !== state.slope || nextStepSlope !== state.stepSlope) state.isochrone = null;
+  state.distanceMetres = nextDistance; state.walkTimeSeconds = state.distanceMetres; state.slope = nextSlope; state.stepSlope = nextStepSlope;
+  $('distance-value').textContent = state.distanceMetres; $('slope-value').textContent = state.slope; $('step-slope-value').textContent = state.stepSlope;
   $('walk-time').textContent = `${(state.walkTimeSeconds / 60).toFixed(state.walkTimeSeconds % 60 ? 1 : 0)} min`;
   $('caption-distance').textContent = Math.round(state.walkTimeSeconds / 60);
-  $('caption-budget').textContent = `${formatDistance(state.distanceMetres)} equivalent budget`;
-  updateSliderPaint($('distance')); updateSliderPaint($('slope'));
+  $('caption-budget').textContent = `${formatDistance(state.distanceMetres)} at 1 m/s`;
+  updateSliderPaint($('distance')); updateSliderPaint($('slope')); updateSliderPaint($('step-slope'));
   render();
   if (!analyze) {
     $('data-status').textContent = 'LIMIT CHANGED · RELEASE TO UPDATE WALK REACH';
@@ -48,7 +53,7 @@ function renderList() {
     const extra = p.routeAnalysis && (p.route_exists === false || (p.accessible === false && !Number.isFinite(Number(p.duration_s))))
       ? 'No connected pedestrian route was returned'
       : p.routeAnalysis
-      ? `${Math.max(1, Math.round(durationMinutes(p)))} min route · ${formatDistance(p.distance_m)} · ${Number(p.max_slope_deg).toFixed(1)}° max`
+      ? `${Math.max(1, Math.round(durationMinutes(p)))} min · ${formatDistance(p.distance_m)} · ${routeGrade(p).toFixed(1)}° overall · ${stepGrade(p).toFixed(1)}° steepest step`
       : `CSDI location · ${formatDistance(p.study_distance_m)} study distance`;
     return `<div class="place-item ${accessible(p) ? 'is-accessible' : ''}" data-id="${escapeHtml(p.id)}"><span class="place-icon ${p.kind}">${icon}</span><span class="place-info"><strong>${escapeHtml(p.name)}</strong><small>${escapeHtml(extra)}</small></span><span class="place-status ${cls}">${escapeHtml(label)}</span></div>`;
   }).join('');
@@ -62,7 +67,7 @@ function renderList() {
 function linePath(p) {
   const [x, y] = p.xy; const [bx, by] = p.bend || [x, y];
   const d = `M 590 470 Q ${bx} ${by} ${x} ${y}`;
-  const classes = accessible(p) ? 'route' : (Number(p.max_slope_deg) > state.slope ? 'route route-steep' : 'route route-outside');
+  const classes = accessible(p) ? 'route' : (routeGrade(p) > state.slope || stepGrade(p) > state.stepSlope ? 'route route-steep' : 'route route-outside');
   return `<path class="${classes}" data-route="${p.id}" d="${d}"/>`;
 }
 function pinMarkup(p) {
@@ -70,8 +75,8 @@ function pinMarkup(p) {
   const cls = p.kind === 'green' ? 'green-dot' : 'gym-dot';
   const glyph = p.kind === 'green' ? '♧' : '✳';
   const [label, statusClass] = status(p);
-  const opacity = Number(p.duration_s) > state.walkTimeSeconds || Number(p.max_slope_deg) > state.slope ? '.48' : '1';
-  return `<g class="place-pin" data-id="${p.id}" opacity="${opacity}" transform="translate(${x} ${y})"><circle class="pin-halo" r="15"/><circle class="pin-dot ${cls}" r="9"/><text text-anchor="middle" y="3.5" fill="white" font-size="10">${glyph}</text><text class="pin-label" x="13" y="-8">${p.name}</text>${statusClass === 'steep' ? `<text x="13" y="7" fill="#a24634" font-size="8" font-family="DM Mono">SLOPE ${p.max_slope_deg.toFixed(1)}°</text>` : ''}</g>`;
+  const opacity = Number(p.duration_s) > state.walkTimeSeconds || routeGrade(p) > state.slope || stepGrade(p) > state.stepSlope ? '.48' : '1';
+  return `<g class="place-pin" data-id="${p.id}" opacity="${opacity}" transform="translate(${x} ${y})"><circle class="pin-halo" r="15"/><circle class="pin-dot ${cls}" r="9"/><text text-anchor="middle" y="3.5" fill="white" font-size="10">${glyph}</text><text class="pin-label" x="13" y="-8">${p.name}</text>${statusClass === 'steep' ? `<text x="13" y="7" fill="#a24634" font-size="8" font-family="DM Mono">${routeGrade(p) > state.slope ? 'ROUTE' : 'STEP'} ${routeGrade(p) > state.slope ? routeGrade(p).toFixed(1) : stepGrade(p).toFixed(1)}°</text>` : ''}</g>`;
 }
 function render() { renderList(); renderCesiumOverlays(); renderMapLibreOverlays(); renderSectionMap(); }
 function pointFromFeature(feature) {
@@ -176,13 +181,13 @@ function applyPresentation() {
       } else if (layer.id.startsWith('walk-buffer-')) {
         map.setLayoutProperty(layer.id, 'visibility', view === 'reach' || view === 'map' ? 'visible' : 'none');
         if (layer.id === 'walk-buffer-fill') {
-          map.setPaintProperty(layer.id, 'fill-color', style === 'diagram' ? '#b9ddc8' : '#cb634c');
-          map.setPaintProperty(layer.id, 'fill-opacity', style === 'diagram' ? .62 : .25);
+          map.setPaintProperty(layer.id, 'fill-color', style === 'diagram' ? '#b9ddc8' : '#7eb297');
+          map.setPaintProperty(layer.id, 'fill-opacity', style === 'diagram' ? .62 : .35);
         }
         if (layer.id === 'walk-buffer-outline') {
-          map.setPaintProperty(layer.id, 'line-color', style === 'diagram' ? '#276d5d' : '#c85d45');
+          map.setPaintProperty(layer.id, 'line-color', '#276d5d');
           map.setPaintProperty(layer.id, 'line-width', style === 'diagram' ? 3.5 : 2.5);
-          map.setPaintProperty(layer.id, 'line-dasharray', style === 'diagram' ? [1, 0] : [2, 2]);
+          map.setPaintProperty(layer.id, 'line-dasharray', [1, 0]);
         }
       } else if (!['accessible-route-casing','accessible-routes','access-place-points','access-place-labels','origin-point','origin-label'].includes(layer.id)) {
         const original = state.mapBasePaint.get(layer.id);
@@ -218,7 +223,7 @@ function syncCesiumReachClip() {
 }
 
 function fitReachView() {
-  const geometry = state.view === 'reach' || state.view === 'map' ? budgetCircleGeometry() : state.isochrone?.geometry;
+  const geometry = state.isochrone?.geometry;
   const rings = geometry?.type === 'Polygon' ? [geometry.coordinates[0]] : geometry?.type === 'MultiPolygon' ? geometry.coordinates.map(polygon => polygon[0]) : [];
   const pointsInReach = rings.flatMap(ring => ring.slice(0, -1));
   if (!pointsInReach.length) return;
@@ -296,7 +301,7 @@ function renderSectionMap() {
   });
   const top = profile.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
   const first = profile[0], last = profile.at(-1), accepted = accessible(place);
-  const gradeText = `${Number(place.max_slope_deg || 0).toFixed(1)}° max grade`;
+  const gradeText = `${routeGrade(place).toFixed(1)}° route grade · ${stepGrade(place).toFixed(1)}° max step`;
   const routeSource = escapeHtml(place.route_source || 'Lands Department 3D pedestrian network');
   const markers = profile.filter((_, i) => i === 0 || i === profile.length - 1 || i % Math.max(1, Math.floor(profile.length / 7)) === 0).map((p, i) => `<circle cx="${p.x}" cy="${p.y}" r="${i === 0 || p === last ? 8 : 4}" fill="${i === 0 ? '#c94f37' : p === last ? '#287461' : '#f9f8f1'}" stroke="${i === 0 ? '#fff' : '#287461'}" stroke-width="3"/>`).join('');
   const lines = `<svg viewBox="0 0 960 520" role="img" aria-label="Terrain section from the community centre to ${escapeHtml(place.name)}"><defs><linearGradient id="sectionGround" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d6bd"/><stop offset="1" stop-color="#e7e6d9"/></linearGradient><linearGradient id="sectionCut" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#aabd9e"/><stop offset="1" stop-color="#738a75"/></linearGradient></defs><path d="M76 255 840 212 918 264 151 315Z" fill="#ebeee2" stroke="#adb8a5"/><path d="M151 315 918 264 918 351 151 405Z" fill="#d4d8ca" stroke="#adb8a5"/><path d="M${top} L${last.x.toFixed(1)} ${(last.y + 112).toFixed(1)} L${first.x.toFixed(1)} ${(first.y + 112).toFixed(1)}Z" fill="url(#sectionCut)" stroke="#667c68" stroke-width="2"/><path d="M${top}" fill="none" stroke="#f7f7ed" stroke-width="17" stroke-linejoin="round"/><path d="M${top}" fill="none" stroke="${accepted ? '#176d5a' : '#bb4c37'}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>${markers}<path d="M102 416h750" stroke="#858e83" stroke-dasharray="5 7"/><path d="M102 408v16m750-16v16" stroke="#858e83"/><text x="102" y="449" class="section-svg-label">0 m · COMMUNITY CENTRE</text><text x="850" y="449" text-anchor="end" class="section-svg-label">${escapeHtml(formatDistance(place.distance_m || total))} · ${escapeHtml(place.name)}</text><text x="76" y="242" class="section-svg-label">ELEVATION</text><text x="76" y="260" class="section-svg-small">${Math.round(minElevation)} m</text><text x="76" y="282" class="section-svg-small">${Math.round(maxElevation)} m</text><rect x="625" y="82" width="234" height="44" rx="3" fill="#fffdf6" stroke="#dadbd2"/><circle cx="647" cy="104" r="6" fill="${accepted ? '#287461' : '#bd4c38'}"/><text x="663" y="109" class="section-svg-label">${accepted ? 'WITHIN WALKING THRESHOLD' : 'OUTSIDE ACCESS THRESHOLD'}</text><text x="122" y="478" class="section-svg-small">3D NETWORK ELEVATION · ${routeSource}</text><text x="840" y="478" text-anchor="end" class="section-svg-label">${gradeText} · ${Math.max(1, Math.round(durationMinutes(place)))} min</text></svg>`;
@@ -305,7 +310,7 @@ function renderSectionMap() {
 function renderMapLibreOverlays() {
   const map = state.maplibre; if (!map || !map.getSource('access-routes')) return;
   const buildingBaseFilter = ['!=', ['get', 'hide_3d'], true];
-  const reachGeometry = state.view === 'reach' ? budgetCircleGeometry() : null;
+  const reachGeometry = state.view === 'reach' ? state.isochrone?.geometry : null;
   const hasReachGeometry = ['Polygon','MultiPolygon'].includes(reachGeometry?.type);
   if (state.view === 'reach' && state.reachStyle === 'diagram' && hasReachGeometry) {
     map.setFilter('3d-buildings-context', ['all', buildingBaseFilter, ['!', ['within', reachGeometry]]]);
@@ -326,7 +331,7 @@ function renderMapLibreOverlays() {
   const extent = Array.from({length: 8}, (_, i) => radialDestination(ORIGIN, 12000, i * 45)); extent.push(extent[0]);
   const signedArea = ring => ring.slice(0, -1).reduce((area, point, i) => { const next = ring[i + 1]; return area + point[0] * next[1] - next[0] * point[1]; }, 0) / 2;
   if (signedArea(extent) < 0) extent.reverse();
-  const maskGeometry = state.view === 'reach' ? budgetCircleGeometry() : state.isochrone?.geometry;
+  const maskGeometry = state.isochrone?.geometry;
   const innerRings = maskGeometry?.type === 'Polygon'
     ? [maskGeometry.coordinates[0].map(point => point.slice())]
     : maskGeometry?.type === 'MultiPolygon'
@@ -340,7 +345,7 @@ function renderMapLibreOverlays() {
   if (map.getLayer('reach-mask-fill') && map.getLayer('3d-buildings-context')) map.moveLayer('reach-mask-fill', '3d-buildings-context');
   const boundaryText = $('reach-boundary-status');
   if (boundaryText) boundaryText.textContent = state.isochrone
-    ? `${state.isochrone.properties.sample_count}/${state.isochrone.properties.requested_samples} safe directions · ${state.isochrone.geometry.type === 'MultiPolygon' ? state.isochrone.geometry.coordinates.length : 1} reachable sectors. Dashed ring = ${Math.round(state.distanceMetres)} m budget cap; it is not slope-screened.`
+    ? `${state.isochrone.properties.sample_count}/${state.isochrone.properties.requested_samples} sampled directions pass the ${Math.round(state.walkTimeSeconds / 60)} min walk-time, ${state.slope}° route-grade and ${state.stepSlope}° next-step limits.`
     : 'Waiting for walking-route samples';
   renderMapLibreSvgRoutes();
 }
@@ -367,23 +372,21 @@ async function landsDRoute(place, origin) {
   const path = rawPath.filter((c, i) => i === 0 || c[0] !== rawPath[i - 1][0] || c[1] !== rawPath[i - 1][1] || c[2] !== rawPath[i - 1][2]);
   if (path.length < 2 || path.some(c => !c.every(Number.isFinite))) throw new Error('3D route elevation samples are missing');
   const slopes = path.slice(1).map((c, i) => Math.atan2(Math.abs(c[2] - path[i][2]), Math.max(.5, haversineMetres(path[i], c))) * 180 / Math.PI);
+  const routeLength = path.slice(1).reduce((sum, point, i) => sum + haversineMetres(path[i], point), 0);
+  const totalRouteGrade = Math.atan2(Math.abs(path.at(-1)[2] - path[0][2]), Math.max(.5, routeLength)) * 180 / Math.PI;
   const summary = payload.directions?.[0]?.summary || {};
   const attrs = feature.attributes || {};
   const minutes = Number(summary.totalTime ?? attrs.Total_Time);
   const distance = Number(summary.totalLength ?? attrs.Total_Length);
   if (!Number.isFinite(minutes) || !Number.isFinite(distance)) throw new Error('Route service returned no walking time or distance');
-  return { routeAnalysis: true, route_exists: true, accessible: true, route_source: 'Lands Department 3D Pedestrian Network', duration_s: Math.round(minutes * 60), distance_m: distance, max_slope_deg: Math.round(Math.max(...slopes) * 10) / 10, path };
+  const maxStepSlope = Math.round(Math.max(...slopes) * 10) / 10;
+  return { routeAnalysis: true, route_exists: true, accessible: true, route_source: 'Lands Department 3D Pedestrian Network', duration_s: Math.round(minutes * 60), distance_m: distance, route_grade_deg: Math.round(totalRouteGrade * 10) / 10, max_step_slope_deg: maxStepSlope, max_slope_deg: maxStepSlope, path };
 }
 function radialDestination(origin, metres, bearing) {
   const angle = bearing * Math.PI / 180, north = metres * Math.cos(angle), east = metres * Math.sin(angle);
   return [origin.longitude + east / (111320 * Math.cos(origin.latitude * Math.PI / 180)), origin.latitude + north / 111320];
 }
-function budgetCircleGeometry(origin = ORIGIN, radius = state.distanceMetres) {
-  const ring = Array.from({ length: 48 }, (_, i) => radialDestination(origin, radius, i * 360 / 48));
-  ring.push(ring[0]);
-  return { type: 'Polygon', coordinates: [ring] };
-}
-function accessiblePrefixEndpoint(path, radius, maxSlope, routeDurationSeconds, timeBudgetSeconds) {
+function accessiblePrefixEndpoint(path, radius, maxRouteSlope, maxStepSlope, routeDurationSeconds, timeBudgetSeconds) {
   if (!path || path.length < 2) return null;
   const routeLength = path.slice(1).reduce((sum, point, i) => sum + Math.max(.5, haversineMetres(path[i], point)), 0);
   const timeLimitedDistance = routeLength * Math.min(1, timeBudgetSeconds / Math.max(routeDurationSeconds, 1));
@@ -392,7 +395,8 @@ function accessiblePrefixEndpoint(path, radius, maxSlope, routeDurationSeconds, 
   for (let i = 1; i < path.length; i++) {
     const previous = path[i - 1], next = path[i], segment = Math.max(.5, haversineMetres(previous, next));
     const grade = Math.atan2(Math.abs(next[2] - previous[2]), segment) * 180 / Math.PI;
-    if (grade > maxSlope) return travelled >= 20 ? previous : null;
+    const cumulativeGrade = Math.atan2(Math.abs(next[2] - path[0][2]), Math.max(.5, travelled + segment)) * 180 / Math.PI;
+    if (grade > maxStepSlope || cumulativeGrade > maxRouteSlope) return travelled >= 20 ? previous : null;
     if (travelled + segment >= endpointDistance) {
       const t = Math.max(0, Math.min(1, (endpointDistance - travelled) / segment));
       return [previous[0] + (next[0] - previous[0]) * t, previous[1] + (next[1] - previous[1]) * t, previous[2] + (next[2] - previous[2]) * t];
@@ -430,13 +434,13 @@ function sampledReachGeometry(boundary, sampleCount, origin) {
 }
 async function buildLandsDContour(origin, originVersion) {
   if (state.google) return;
-  const distanceMetres = state.distanceMetres, maxSlope = state.slope;
+  const distanceMetres = state.distanceMetres, maxSlope = state.slope, maxStepSlope = state.stepSlope;
   const walkTimeSeconds = state.walkTimeSeconds;
-  const cacheKey = `${originVersion}/${walkTimeSeconds}/${maxSlope}`;
+  const cacheKey = `${originVersion}/${walkTimeSeconds}/${maxSlope}/${maxStepSlope}`;
   if (state.boundaryCache.has(cacheKey)) {
     state.isochrone = state.boundaryCache.get(cacheKey);
     state.boundarySamples = state.isochrone?.properties?.sample_count || 0;
-    $('data-status').textContent = state.isochrone ? `LANDS DEPARTMENT 3D ROUTES · ${state.boundarySamples}/24 SLOPE-SAFE DIRECTIONS` : 'LANDS DEPARTMENT 3D ROUTES · NO REACH CONTOUR';
+    $('data-status').textContent = state.isochrone ? `LANDS DEPARTMENT 3D ROUTES · ${state.boundarySamples}/24 SAFE DIRECTIONS` : 'LANDS DEPARTMENT 3D ROUTES · NO REACH CONTOUR';
     render(); fitReachView(); return;
   }
   const boundary = [], sampleCount = 24, bearingStep = 360 / sampleCount;
@@ -444,13 +448,13 @@ async function buildLandsDContour(origin, originVersion) {
   const sampleWorker = async () => {
     while (true) {
       const spoke = nextSpoke++;
-      if (spoke >= sampleCount || originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope) return;
+      if (spoke >= sampleCount || originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope || maxStepSlope !== state.stepSlope) return;
       $('data-status').textContent = `TRACING WALK REACH · ${completedSpokes}/${sampleCount} DIRECTIONS`;
       const candidateRadii = [3200, 1600, 800, 400, 200, 100];
       let sampledReach = null, shortestUsefulReach = Math.min(120, Math.max(60, distanceMetres * .35));
       try {
         for (const radius of candidateRadii) {
-          if (originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope) return;
+          if (originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope || maxStepSlope !== state.stepSlope) return;
           const routeKey = `${originVersion}/${spoke}/${radius}`;
           let route = state.boundaryRouteCache.get(routeKey);
           const requestRoute = route === undefined;
@@ -459,9 +463,9 @@ async function buildLandsDContour(origin, originVersion) {
             route = await landsDRoute({ id: `buffer-${spoke}-${radius}`, name: 'Walking-time boundary sample', coordinates }, origin);
             state.boundaryRouteCache.set(routeKey, route);
           }
-          if (originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope) return;
+          if (originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope || maxStepSlope !== state.stepSlope) return;
           if (route.route_exists && route.path?.length) {
-            const endpoint = accessiblePrefixEndpoint(route.path, distanceMetres * 1.6, maxSlope, route.duration_s, walkTimeSeconds);
+            const endpoint = accessiblePrefixEndpoint(route.path, distanceMetres * 1.6, maxSlope, maxStepSlope, route.duration_s, walkTimeSeconds);
             if (endpoint) {
               const reach = { bearing: spoke * bearingStep, coordinate: endpoint, originElevation: Number(route.path[0][2]) };
               const radialReach = haversineMetres([origin.longitude, origin.latitude], endpoint);
@@ -476,14 +480,13 @@ async function buildLandsDContour(origin, originVersion) {
       } catch (error) { console.warn(`Walking-time boundary sample ${spoke + 1} unavailable.`, error); }
       completedSpokes += 1;
       $('data-status').textContent = `TRACING WALK REACH · ${completedSpokes}/${sampleCount} DIRECTIONS`;
-      if (requestRoute && spoke + 1 < sampleCount) await wait(250);
     }
   };
   await Promise.all(Array.from({ length: Math.min(4, sampleCount) }, sampleWorker));
-  if (state.google || originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope) return;
+  if (state.google || originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope || maxStepSlope !== state.stepSlope) return;
   state.boundarySamples = boundary.length;
   const geometry = boundary.length >= 2 ? sampledReachGeometry(boundary, sampleCount, origin) : null;
-  if (geometry) state.isochrone = { type: 'Feature', properties: { method: '24 Lands Department 3D pedestrian-network bearings at 15-degree spacing with progressively closer targets when a long target is disconnected. Connected safe samples form reach sectors and isolated samples show their one-bearing cell. Unsampled or slope-blocked directions remain open. Travel time is apportioned along each route by length.', sample_count: boundary.length, requested_samples: sampleCount, walk_time_seconds: walkTimeSeconds, equivalent_distance_m: distanceMetres, max_slope_deg: maxSlope }, geometry };
+  if (geometry) state.isochrone = { type: 'Feature', properties: { method: '24 Lands Department 3D pedestrian-network bearings at 15-degree spacing with progressively closer targets when a long target is disconnected. Reach is bounded by route time, total route grade, and maximum grade between consecutive elevation samples. Unsampled or blocked directions remain open.', sample_count: boundary.length, requested_samples: sampleCount, walk_time_seconds: walkTimeSeconds, equivalent_distance_m: distanceMetres, max_route_slope_deg: maxSlope, max_step_slope_deg: maxStepSlope }, geometry };
   else state.isochrone = null;
   state.boundaryCache.set(cacheKey, state.isochrone);
   $('data-status').textContent = state.isochrone
@@ -499,10 +502,10 @@ async function runLandsDAnalysis() {
   if (state.routeQueueRunning) { state.routeQueueRequested = true; return; }
   state.routeQueueRunning = true;
   const originVersion = state.originVersion, origin = { ...ORIGIN };
-  const distanceAtStart = state.distanceMetres, slopeAtStart = state.slope;
+  const distanceAtStart = state.distanceMetres, slopeAtStart = state.slope, stepSlopeAtStart = state.stepSlope;
   try {
     await buildLandsDContour(origin, originVersion);
-    if (state.google || originVersion !== state.originVersion || distanceAtStart !== state.distanceMetres || slopeAtStart !== state.slope) return;
+    if (state.google || originVersion !== state.originVersion || distanceAtStart !== state.distanceMetres || slopeAtStart !== state.slope || stepSlopeAtStart !== state.stepSlope) return;
     const maxSeedDistance = Math.min(4000, state.distanceMetres * 2);
     const todo = state.places.filter(p => !p.routeAnalysis && !state.routeFailures.has(p.id) && p.study_distance_m <= maxSeedDistance);
     for (let i = 0; i < todo.length; i += 1) {
@@ -536,10 +539,6 @@ function renderMapLibreSvgRoutes() {
     const d = screen.map((point, i) => `${i ? 'L' : 'M'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ') + ' Z';
     return `<path class="map-reach-buffer" d="${d}"/>`;
   }).join('');
-  const budgetRing = budgetCircleGeometry();
-  const budgetScreen = budgetRing.coordinates[0].map(point => map.project(point.slice(0, 2)));
-  const budgetPath = budgetScreen.every(point => Number.isFinite(point.x) && Number.isFinite(point.y))
-    ? `<path class="map-budget-ring" d="${budgetScreen.map((point, i) => `${i ? 'L' : 'M'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ')} Z"/>` : '';
   const markup = state.places.filter(p => accessible(p) && (state.filter === 'all' || p.kind === state.filter)).map(p => {
     if (!p.path?.length) return '';
     const path = p.path.map(c => c.slice(0, 2));
@@ -554,7 +553,7 @@ function renderMapLibreSvgRoutes() {
   const originMarkup = Number.isFinite(origin.x) && Number.isFinite(origin.y)
     ? `<circle class="map-route-origin-halo" cx="${origin.x.toFixed(1)}" cy="${origin.y.toFixed(1)}" r="12"/><circle class="map-route-origin-dot" cx="${origin.x.toFixed(1)}" cy="${origin.y.toFixed(1)}" r="7"/><text class="map-route-label map-origin-label" x="${(origin.x + 14).toFixed(1)}" y="${(origin.y - 11).toFixed(1)}">COMMUNITY CENTRE</text>`
     : '';
-  svg.innerHTML = `${(state.view === 'reach' || state.view === 'map') ? budgetPath : ''}${bufferMarkup}${markup}${originMarkup}`;
+  svg.innerHTML = `${bufferMarkup}${markup}${originMarkup}`;
 }
 function addMapLibreLayers(map) {
   for (const layer of map.getStyle().layers) state.mapBasePaint.set(layer.id, { fillColor: layer.paint?.['fill-color'], lineColor: layer.paint?.['line-color'], visibility: layer.layout?.visibility || 'visible' });
@@ -652,7 +651,7 @@ async function runGoogleAnalysis(version) {
   state.googleController = controller;
   const destinations = candidatePlaces().map(p => ({ id: p.id, name: p.name, kind: p.kind, latitude: p.coordinates[1], longitude: p.coordinates[0] }));
   try {
-    const request = { origin: { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude }, destinations, walk_time_seconds: state.walkTimeSeconds, max_slope_deg: state.slope };
+    const request = { origin: { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude }, destinations, walk_time_seconds: state.walkTimeSeconds, max_route_slope_deg: state.slope, max_step_slope_deg: state.stepSlope };
     const [response, reachResponse] = await Promise.all([
       fetch(apiUrl('analyze'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request), signal: controller.signal }),
       fetch(apiUrl('isochrone'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request), signal: controller.signal }),
@@ -678,8 +677,8 @@ async function runGoogleAnalysis(version) {
   }
 }
 
-$('distance').addEventListener('input', () => setRange(false)); $('slope').addEventListener('input', () => setRange(false));
-$('distance').addEventListener('change', () => setRange()); $('slope').addEventListener('change', () => setRange());
+ $('distance').addEventListener('input', () => setRange(false)); $('slope').addEventListener('input', () => setRange(false)); $('step-slope').addEventListener('input', () => setRange(false));
+ $('distance').addEventListener('change', () => setRange()); $('slope').addEventListener('change', () => setRange()); $('step-slope').addEventListener('change', () => setRange());
   document.querySelectorAll('.filter').forEach(b => b.addEventListener('click', () => { state.filter = b.dataset.filter; document.querySelectorAll('.filter').forEach(item => item.classList.toggle('active', item === b)); render(); }));
 document.querySelectorAll('.view-option').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
 document.querySelectorAll('.style-option').forEach(b => b.addEventListener('click', () => setMapStyle(b.dataset.style)));

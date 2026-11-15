@@ -40,7 +40,8 @@ class AnalyzeRequest(BaseModel):
     origin: dict[str, float] | None = None
     destinations: list[Destination] = Field(default_factory=list, max_length=100)
     walk_time_seconds: int = Field(300, ge=100, le=2000)
-    max_slope_deg: float = Field(10, ge=3, le=20)
+    max_route_slope_deg: float = Field(30, ge=3, le=50)
+    max_step_slope_deg: float = Field(15, ge=0, le=20)
 
 
 @app.get("/")
@@ -231,10 +232,12 @@ async def google_route(client: httpx.AsyncClient, origin: dict, dest: Destinatio
         b = (right["location"]["lat"], right["location"]["lng"])
         distance = haversine(a, b)
         slopes.append(math.degrees(math.atan(abs(right["elevation"] - left["elevation"]) / max(distance, 0.5))))
-    max_slope = max(slopes, default=0)
+    max_step_slope = max(slopes, default=0)
+    total_horizontal_distance = sum(haversine((left["location"]["lat"], left["location"]["lng"]), (right["location"]["lat"], right["location"]["lng"])) for left, right in zip(samples, samples[1:]))
+    route_slope = math.degrees(math.atan2(abs(samples[-1]["elevation"] - samples[0]["elevation"]), max(total_horizontal_distance, 0.5)))
     path_coords = [[s["location"]["lng"], s["location"]["lat"], s["elevation"]] for s in samples]
     duration_s = int(float(str(route.get("duration", "0s")).rstrip("s")))
-    return {"id": dest.id, "name": dest.name, "kind": dest.kind, "distance_m": route.get("distanceMeters", 0), "duration": route.get("duration"), "duration_s": duration_s, "max_slope_deg": round(max_slope, 1), "accessible": True, "path": path_coords, "elevations": [s["elevation"] for s in samples]}
+    return {"id": dest.id, "name": dest.name, "kind": dest.kind, "distance_m": route.get("distanceMeters", 0), "duration": route.get("duration"), "duration_s": duration_s, "route_grade_deg": round(route_slope, 1), "max_step_slope_deg": round(max_step_slope, 1), "max_slope_deg": round(max_step_slope, 1), "accessible": True, "path": path_coords, "elevations": [s["elevation"] for s in samples]}
 
 
 @app.post("/api/analyze")
@@ -250,14 +253,16 @@ async def analyze(request: AnalyzeRequest):
                     result = await google_route(client, origin, dest)
                     if result.get("duration_s", 0) > request.walk_time_seconds:
                         result.update(accessible=False, reason="Beyond selected walking-time threshold")
-                    elif result.get("max_slope_deg", 0) > request.max_slope_deg:
-                        result.update(accessible=False, reason="Route exceeds slope limit")
+                    elif result.get("route_grade_deg", 0) > request.max_route_slope_deg:
+                        result.update(accessible=False, reason="Route exceeds overall grade limit")
+                    elif result.get("max_step_slope_deg", 0) > request.max_step_slope_deg:
+                        result.update(accessible=False, reason="A route segment exceeds next-step grade limit")
                     return result
                 except (httpx.HTTPError, KeyError, ValueError) as exc:
                     return {"id": dest.id, "name": dest.name, "kind": dest.kind, "accessible": False, "reason": f"Route analysis unavailable: {exc}"}
 
         results = await asyncio.gather(*(analyze_destination(dest) for dest in request.destinations))
-    return {"results": results, "origin": origin, "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg}
+    return {"results": results, "origin": origin, "walk_time_seconds": request.walk_time_seconds, "max_route_slope_deg": request.max_route_slope_deg, "max_step_slope_deg": request.max_step_slope_deg}
 
 
 def walking_candidates(origin: dict[str, float], distance_m: int, spokes: int = 24) -> list[dict]:
@@ -295,9 +300,20 @@ def sampled_reach_geometry(boundary: list[dict], origin: dict[str, float], spoke
         run = [start]
         while (run[-1] + 1) % spokes in valid and (run[-1] + 1) % spokes != start:
             run.append((run[-1] + 1) % spokes)
-        if len(run) < 2:
-            continue
-        ring = [origin_point] + [[by_spoke[i]["longitude"], by_spoke[i]["latitude"], by_spoke[i]["elevation_m"]] for i in run] + [origin_point]
+        if len(run) == 1:
+            point = by_spoke[run[0]]
+            radius = haversine((origin["latitude"], origin["longitude"]), (point["latitude"], point["longitude"]))
+            bearing = 2 * math.pi * run[0] / spokes
+            half_step = math.pi / spokes
+            left_bearing, right_bearing = bearing - half_step, bearing + half_step
+            def edge(angle: float) -> list[float]:
+                north, east = radius * math.cos(angle), radius * math.sin(angle)
+                lat = origin["latitude"] + north / 111_320
+                lon = origin["longitude"] + east / (111_320 * math.cos(math.radians(origin["latitude"])))
+                return [lon, lat, point["elevation_m"]]
+            ring = [origin_point, edge(left_bearing), [point["longitude"], point["latitude"], point["elevation_m"]], edge(right_bearing), origin_point]
+        else:
+            ring = [origin_point] + [[by_spoke[i]["longitude"], by_spoke[i]["latitude"], by_spoke[i]["elevation_m"]] for i in run] + [origin_point]
         sectors.append([ring])
     return {"type": "MultiPolygon", "coordinates": sectors} if sectors else None
 
@@ -311,9 +327,9 @@ def seconds(value: str | None) -> int:
 
 @app.post("/api/isochrone")
 async def isochrone(request: AnalyzeRequest):
-    """Approximate a Google walking-time contour from matrix and slope-screened routes."""
+    """Approximate a Google walking-time contour from routed-time and two grade screens."""
     if not API_KEY:
-        raise HTTPException(503, "Google Maps Platform key is not configured; the static preview does not show a fabricated circle")
+        raise HTTPException(503, "Google Maps Platform key is not configured; the static preview uses Lands Department pedestrian routes")
     origin = request.origin or ORIGIN
     candidates = walking_candidates(origin, request.walk_time_seconds)
     matrix_request = {
@@ -378,20 +394,22 @@ async def isochrone(request: AnalyzeRequest):
                         route = await google_route(client, origin, dest)
                     except (httpx.HTTPError, KeyError, ValueError):
                         continue
-                if route["duration_s"] <= request.walk_time_seconds and route["max_slope_deg"] <= request.max_slope_deg:
+                if (route["duration_s"] <= request.walk_time_seconds
+                    and route["route_grade_deg"] <= request.max_route_slope_deg
+                    and route["max_step_slope_deg"] <= request.max_step_slope_deg):
                     endpoint = route["path"][-1]
-                    return {"spoke": spoke, "longitude": endpoint[0], "latitude": endpoint[1], "elevation_m": endpoint[2], "origin_elevation_m": route["path"][0][2], "duration_s": route["duration_s"], "distance_m": route["distance_m"], "max_slope_deg": route["max_slope_deg"]}
+                    return {"spoke": spoke, "longitude": endpoint[0], "latitude": endpoint[1], "elevation_m": endpoint[2], "origin_elevation_m": route["path"][0][2], "duration_s": route["duration_s"], "distance_m": route["distance_m"], "route_grade_deg": route["route_grade_deg"], "max_step_slope_deg": route["max_step_slope_deg"]}
             return None
 
         boundary = await asyncio.gather(*(find_spoke_edge(spoke) for spoke in range(24)))
     boundary = [point for point in boundary if point]
-    if len(boundary) < 16:
-        return {"feature": None, "boundary_samples": len(boundary), "requested_samples": 24, "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg, "message": "Too few slope-safe walking directions were found to draw a reliable contour."}
+    if len(boundary) < 1:
+        return {"feature": None, "boundary_samples": 0, "requested_samples": 24, "walk_time_seconds": request.walk_time_seconds, "max_route_slope_deg": request.max_route_slope_deg, "max_step_slope_deg": request.max_step_slope_deg, "message": "No walking direction passed the route time and grade screens."}
     geometry = sampled_reach_geometry(boundary, origin)
     if geometry is None:
-        return {"feature": None, "boundary_samples": len(boundary), "requested_samples": 24, "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg, "message": "No adjacent pair of slope-safe directions was found; no filled reach area is shown."}
-    feature = {"type": "Feature", "properties": {"method": "24 Google Routes walking-time directions with interpolated and verified edge routes; elevation-screened sectors are drawn only between adjacent valid directions, leaving failed directions open", "sample_count": len(boundary), "requested_samples": 24, "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg}, "geometry": geometry}
-    return {"feature": feature, "boundary_samples": len(boundary), "requested_samples": 24, "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg}
+        return {"feature": None, "boundary_samples": len(boundary), "requested_samples": 24, "walk_time_seconds": request.walk_time_seconds, "max_route_slope_deg": request.max_route_slope_deg, "max_step_slope_deg": request.max_step_slope_deg, "message": "A reach area could not be formed from the sampled directions."}
+    feature = {"type": "Feature", "properties": {"method": "24 Google Routes walking-time directions, screened by overall route grade and grade between consecutive elevation samples; unsampled directions remain open", "sample_count": len(boundary), "requested_samples": 24, "walk_time_seconds": request.walk_time_seconds, "max_route_slope_deg": request.max_route_slope_deg, "max_step_slope_deg": request.max_step_slope_deg}, "geometry": geometry}
+    return {"feature": feature, "boundary_samples": len(boundary), "requested_samples": 24, "walk_time_seconds": request.walk_time_seconds, "max_route_slope_deg": request.max_route_slope_deg, "max_step_slope_deg": request.max_step_slope_deg}
 
 
 app.mount("/", StaticFiles(directory=ROOT / "static", html=True), name="site")
