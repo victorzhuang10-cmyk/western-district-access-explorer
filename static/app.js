@@ -198,7 +198,7 @@ function buildLandsDStops(place, origin) {
 }
 async function landsDRoute(place, origin) {
   const params = new URLSearchParams({ stops: JSON.stringify(buildLandsDStops(place, origin)), travelMode: '1', directionsLanguage: 'en', directionsLengthUnits: 'esriNAUMeters', outSR: '4326', f: 'json', returnZ: 'true', directionStyleName: 'NA Campus' });
-  const response = await fetch(`https://mapapi.hkmapservice.gov.hk/PedRoute/NAServer/route/solve?${params}`);
+  const response = await fetch(`https://mapapi.hkmapservice.gov.hk/PedRoute/NAServer/route/solve?${params}`, { signal: AbortSignal.timeout(15000) });
   if (!response.ok) throw new Error(`Lands Department route service returned ${response.status}`);
   const payload = await response.json();
   const feature = payload.routes?.features?.[0];
