@@ -3,7 +3,7 @@ const MAP_CENTER = { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude };
 const $ = (id) => document.getElementById(id);
 const apiUrl = (path) => new URL(`${location.pathname.includes('/static/') ? '../' : './'}api/${path}`, document.baseURI).toString();
 const staticUrl = (path) => new URL(`./${path}`, document.baseURI).toString();
-const state = { distanceMetres: 300, walkTimeSeconds: 300, slope: 15, filter: 'all', view: 'reach', mapStyle: 'detailed', massingStyle: 'detailed', reachStyle: 'detailed', places: [], google: false, isochrone: null, boundarySamples: 0, sectionPlaceId: null, map: null, maplibre: null, tileset: null, clippingSignature: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, googleAnalysisVersion: 0, googleController: null, routeFailures: new Set(), boundaryCache: new Map(), boundaryRouteCache: new Map() };
+const state = { distanceMetres: 300, walkTimeSeconds: 300, slope: 15, filter: 'all', view: 'map', mapStyle: 'detailed', massingStyle: 'diagram', reachStyle: 'diagram', places: [], google: false, isochrone: null, boundarySamples: 0, sectionPlaceId: null, map: null, maplibre: null, mapBasePaint: new Map(), tileset: null, clippingSignature: null, routeEntities: [], markerEntities: [], zoom: 1, pickOrigin: false, routeQueueRunning: false, routeQueueRequested: false, originVersion: 0, googleAnalysisVersion: 0, googleController: null, routeFailures: new Set(), boundaryCache: new Map(), boundaryRouteCache: new Map() };
 
 function formatDistance(m) { return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`; }
 function durationMinutes(p) { return p.duration_s != null ? p.duration_s / 60 : null; }
@@ -28,6 +28,7 @@ function setRange(analyze = true) {
   $('distance-value').textContent = state.distanceMetres; $('slope-value').textContent = state.slope;
   $('walk-time').textContent = `${(state.walkTimeSeconds / 60).toFixed(state.walkTimeSeconds % 60 ? 1 : 0)} min`;
   $('caption-distance').textContent = Math.round(state.walkTimeSeconds / 60);
+  $('caption-budget').textContent = `${formatDistance(state.distanceMetres)} equivalent budget`;
   updateSliderPaint($('distance')); updateSliderPaint($('slope'));
   render();
   if (!analyze) {
@@ -146,29 +147,52 @@ function applyPresentation() {
   const shell = document.querySelector('.map-shell');
   shell.classList.toggle('diagram-mode', style === 'diagram');
   shell.classList.toggle('reach-mode', view === 'reach');
-  $('presentation-title').textContent = `${view === 'map' ? '2D map' : view === 'massing' ? '3D massing' : '3D reach'} · ${style}`;
+  if ($('reach-legend')) $('reach-legend').hidden = view === 'massing';
+  const presentationName = view === 'map' ? '2D City' : view === 'massing' ? '3D City' : '3D Reach';
+  const styleName = view === 'map' ? (style === 'detailed' ? 'Colored street map' : 'Simplified route diagram')
+    : view === 'massing' ? (style === 'detailed' ? 'Textured 3D city' : 'Building massing + routes')
+      : (style === 'detailed' ? 'Detailed city + reach overlay' : 'Carved reach + highlighted routes');
+  $('presentation-title').textContent = `${presentationName} · ${styleName}`;
+  if ($('style-detailed-label')) $('style-detailed-label').textContent = view === 'map' ? 'Colored map' : view === 'massing' ? 'Textured 3D' : 'Detailed render';
+  if ($('style-diagram-label')) $('style-diagram-label').textContent = view === 'map' ? 'Diagram' : view === 'massing' ? 'Massing' : 'Carved buffer';
+  const detailFallback = $('detail-fallback');
+  if (detailFallback) detailFallback.hidden = !(threeD && style === 'detailed' && !state.map);
   if (state.maplibre) {
     const map = state.maplibre;
     for (const layer of map.getStyle().layers) {
       if (layer.id === '3d-buildings-context') {
-        map.setLayoutProperty(layer.id, 'visibility', threeD && view === 'reach' ? 'visible' : 'none');
-        map.setPaintProperty(layer.id, 'fill-extrusion-color', '#9fa99f');
-        map.setPaintProperty(layer.id, 'fill-extrusion-opacity', style === 'diagram' ? .58 : .42);
+        map.setLayoutProperty(layer.id, 'visibility', threeD && view === 'reach' && style === 'diagram' ? 'visible' : 'none');
+        map.setPaintProperty(layer.id, 'fill-extrusion-color', '#f7f7f4');
+        map.setPaintProperty(layer.id, 'fill-extrusion-opacity', .98);
       } else if (layer.id === '3d-buildings') {
         map.setLayoutProperty(layer.id, 'visibility', threeD ? 'visible' : 'none');
-        map.setPaintProperty(layer.id, 'fill-extrusion-color', style === 'diagram' ? '#f7f7f1' : '#b7c1b3');
-        map.setPaintProperty(layer.id, 'fill-extrusion-opacity', style === 'diagram' ? .98 : .72);
+        map.setPaintProperty(layer.id, 'fill-extrusion-color', view === 'reach' && style === 'diagram' ? '#bed8c7' : style === 'diagram' ? '#e5e4dc' : '#aebcac');
+        map.setPaintProperty(layer.id, 'fill-extrusion-opacity', .94);
       } else if (layer.id === 'reach-mask-fill') {
-        map.setLayoutProperty(layer.id, 'visibility', view === 'reach' ? 'visible' : 'none');
-        map.setPaintProperty(layer.id, 'fill-opacity', style === 'diagram' ? .24 : .14);
+        map.setLayoutProperty(layer.id, 'visibility', view === 'reach' && style === 'diagram' ? 'visible' : 'none');
+        map.setPaintProperty(layer.id, 'fill-color', '#f6f6f2');
+        map.setPaintProperty(layer.id, 'fill-opacity', .84);
       } else if (layer.id.startsWith('walk-buffer-')) {
         map.setLayoutProperty(layer.id, 'visibility', view === 'reach' || view === 'map' ? 'visible' : 'none');
-      } else if (!['accessible-route-casing','accessible-routes','access-place-points','access-place-labels','origin-point','origin-label'].includes(layer.id)) {
-        if (layer.type === 'fill' && layer.paint?.['fill-color']) {
-          const id = layer.id.toLowerCase();
-          map.setPaintProperty(layer.id, 'fill-color', id.includes('water') ? '#bfd2d0' : id.includes('park') || id.includes('grass') ? '#dce6d9' : style === 'diagram' ? '#e7e8df' : '#d9ddd4');
+        if (layer.id === 'walk-buffer-fill') {
+          map.setPaintProperty(layer.id, 'fill-color', style === 'diagram' ? '#b9ddc8' : '#cb634c');
+          map.setPaintProperty(layer.id, 'fill-opacity', style === 'diagram' ? .62 : .25);
         }
-        if (layer.type === 'line' && layer.paint?.['line-color']) map.setPaintProperty(layer.id, 'line-color', style === 'diagram' ? '#c5c9bf' : '#aeb5ac');
+        if (layer.id === 'walk-buffer-outline') {
+          map.setPaintProperty(layer.id, 'line-color', style === 'diagram' ? '#276d5d' : '#c85d45');
+          map.setPaintProperty(layer.id, 'line-width', style === 'diagram' ? 3.5 : 2.5);
+          map.setPaintProperty(layer.id, 'line-dasharray', style === 'diagram' ? [1, 0] : [2, 2]);
+        }
+      } else if (!['accessible-route-casing','accessible-routes','access-place-points','access-place-labels','origin-point','origin-label'].includes(layer.id)) {
+        const original = state.mapBasePaint.get(layer.id);
+        if (style === 'diagram' && layer.type === 'symbol') map.setLayoutProperty(layer.id, 'visibility', 'none');
+        else if (original) map.setLayoutProperty(layer.id, 'visibility', original.visibility);
+        if (style === 'diagram' && layer.type === 'fill' && layer.paint?.['fill-color']) {
+          const id = layer.id.toLowerCase();
+          map.setPaintProperty(layer.id, 'fill-color', id.includes('water') ? (style === 'diagram' ? '#dce5e5' : '#bfd2d0') : id.includes('park') || id.includes('grass') ? (style === 'diagram' ? '#e6eee4' : '#dce6d9') : style === 'diagram' ? '#eeede6' : '#d9ddd4');
+        } else if (style !== 'diagram' && original?.fillColor !== undefined && layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', original.fillColor);
+        if (style === 'diagram' && layer.type === 'line' && layer.paint?.['line-color']) map.setPaintProperty(layer.id, 'line-color', '#c7c9c1');
+        else if (style !== 'diagram' && original?.lineColor !== undefined && layer.type === 'line') map.setPaintProperty(layer.id, 'line-color', original.lineColor);
       }
     }
     if (!(view === 'reach' && ['Polygon','MultiPolygon'].includes(state.isochrone?.geometry?.type))) map.flyTo({ center: [ORIGIN.longitude, ORIGIN.latitude], zoom: threeD ? 16.7 : 15.6, pitch: threeD ? 48 : 0, bearing: threeD && style === 'detailed' ? -12 : 0, duration: 550 });
@@ -180,7 +204,7 @@ function applyPresentation() {
     if (view === 'reach' && ['Polygon','MultiPolygon'].includes(state.isochrone?.geometry?.type)) fitReachView();
     else state.map.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(ORIGIN.longitude, ORIGIN.latitude, threeD ? Math.max(700, state.distanceMetres * 3.2) : 1750), orientation: { heading: 0, pitch: Cesium.Math.toRadians(threeD ? -50 : -72), roll: 0 }, duration: .6 });
   }
-  $('map-data-label').textContent = view === 'map' ? `2D ${style.toUpperCase()} MAP · ROUTE-TIME REACH` : view === 'massing' ? `3D ${style.toUpperCase()} MASSING · ACCESS ROUTES` : `3D ${style.toUpperCase()} REACH · ROUTE SAMPLES + BUFFER`;
+  $('map-data-label').textContent = view === 'map' ? `2D CITY · ${styleName.toUpperCase()} · WALK BUFFER` : view === 'massing' ? `3D CITY · ${styleName.toUpperCase()} · ACCESS ROUTES` : `3D REACH · ${styleName.toUpperCase()} · ${state.boundarySamples}/24 SAMPLE DIRECTIONS`;
   renderMapLibreOverlays(); renderCesiumOverlays();
 }
 
@@ -193,7 +217,7 @@ function syncCesiumReachClip() {
 }
 
 function fitReachView() {
-  const geometry = state.isochrone?.geometry;
+  const geometry = state.view === 'reach' || state.view === 'map' ? budgetCircleGeometry() : state.isochrone?.geometry;
   const rings = geometry?.type === 'Polygon' ? [geometry.coordinates[0]] : geometry?.type === 'MultiPolygon' ? geometry.coordinates.map(polygon => polygon[0]) : [];
   const pointsInReach = rings.flatMap(ring => ring.slice(0, -1));
   if (!pointsInReach.length) return;
@@ -206,7 +230,12 @@ function fitReachView() {
   if (state.maplibre && state.view === 'reach' && (!state.map || state.reachStyle === 'diagram')) {
     const bounds = new maplibregl.LngLatBounds();
     pointsInReach.forEach(point => bounds.extend([point[0], point[1]]));
-    state.maplibre.fitBounds(bounds, { padding: { top: 105, right: 85, bottom: 150, left: 85 }, maxZoom: 18.3, duration: 700, pitch: 48, bearing: 0 });
+    state.maplibre.fitBounds(bounds, { padding: { top: 105, right: 85, bottom: 150, left: 85 }, maxZoom: 16.8, duration: 700, pitch: 38, bearing: 0 });
+  }
+  if (state.maplibre && state.view === 'map') {
+    const bounds = new maplibregl.LngLatBounds();
+    pointsInReach.forEach(point => bounds.extend([point[0], point[1]]));
+    state.maplibre.fitBounds(bounds, { padding: { top: 95, right: 80, bottom: 100, left: 80 }, maxZoom: 17.5, duration: 650, pitch: 0, bearing: 0 });
   }
 }
 
@@ -228,7 +257,7 @@ function renderCesiumOverlays() {
     const hierarchy = hasElevation
       ? Cesium.Cartesian3.fromDegreesArrayHeights(coordinates.flatMap(c => [c[0], c[1], Number(c[2])]))
       : Cesium.Cartesian3.fromDegreesArray(coordinates.flatMap(c => c.slice(0, 2)));
-    const polygon = { hierarchy, material: Cesium.Color.fromCssColorString('#cb5237').withAlpha(.18), outline: true, outlineColor: Cesium.Color.fromCssColorString('#cb5237').withAlpha(.9), outlineWidth: 2 };
+    const polygon = { hierarchy, material: Cesium.Color.fromCssColorString('#cb5237').withAlpha(.32), outline: true, outlineColor: Cesium.Color.fromCssColorString('#a94732').withAlpha(.98), outlineWidth: 3 };
     if (hasElevation) polygon.perPositionHeight = true;
     else polygon.height = 8;
     state.routeEntities.push(state.map.entities.add({ polygon }));
@@ -275,8 +304,15 @@ function renderSectionMap() {
 function renderMapLibreOverlays() {
   const map = state.maplibre; if (!map || !map.getSource('access-routes')) return;
   const buildingBaseFilter = ['!=', ['get', 'hide_3d'], true];
-  const reachGeometry = state.view === 'reach' ? state.isochrone?.geometry : null;
-  map.setFilter('3d-buildings', ['Polygon','MultiPolygon'].includes(reachGeometry?.type) ? ['all', buildingBaseFilter, ['within', reachGeometry]] : buildingBaseFilter);
+  const reachGeometry = state.view === 'reach' ? budgetCircleGeometry() : null;
+  const hasReachGeometry = ['Polygon','MultiPolygon'].includes(reachGeometry?.type);
+  if (state.view === 'reach' && state.reachStyle === 'diagram' && hasReachGeometry) {
+    map.setFilter('3d-buildings-context', ['all', buildingBaseFilter, ['!', ['within', reachGeometry]]]);
+    map.setFilter('3d-buildings', ['all', buildingBaseFilter, ['within', reachGeometry]]);
+  } else {
+    map.setFilter('3d-buildings-context', buildingBaseFilter);
+    map.setFilter('3d-buildings', buildingBaseFilter);
+  }
   const inReach = state.places.filter(p => accessible(p) && (state.filter === 'all' || p.kind === state.filter));
   const routes = inReach.filter(p => p.path?.length).map(p => ({ type: 'Feature', properties: { id: p.id, name: p.name, kind: p.kind }, geometry: { type: 'LineString', coordinates: p.path.map(c => c.slice(0, 2)) } }));
   const places = inReach.filter(p => p.coordinates).map(p => {
@@ -289,12 +325,22 @@ function renderMapLibreOverlays() {
   const extent = Array.from({length: 8}, (_, i) => radialDestination(ORIGIN, 12000, i * 45)); extent.push(extent[0]);
   const signedArea = ring => ring.slice(0, -1).reduce((area, point, i) => { const next = ring[i + 1]; return area + point[0] * next[1] - next[0] * point[1]; }, 0) / 2;
   if (signedArea(extent) < 0) extent.reverse();
-  const innerRing = state.isochrone?.geometry?.type === 'Polygon' ? state.isochrone.geometry.coordinates[0].map(point => point.slice()) : null;
-  if (innerRing && signedArea(innerRing) > 0) innerRing.reverse();
-  const reachMask = innerRing ? { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [extent, innerRing] } } : null;
+  const maskGeometry = state.view === 'reach' ? budgetCircleGeometry() : state.isochrone?.geometry;
+  const innerRings = maskGeometry?.type === 'Polygon'
+    ? [maskGeometry.coordinates[0].map(point => point.slice())]
+    : maskGeometry?.type === 'MultiPolygon'
+      ? maskGeometry.coordinates.map(polygon => polygon[0].map(point => point.slice()))
+      : [];
+  innerRings.forEach(ring => { if (signedArea(ring) > 0) ring.reverse(); });
+  const reachMask = innerRings.length ? { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [extent, ...innerRings] } } : null;
   const maskData = { type: 'FeatureCollection', features: reachMask ? [reachMask] : [] };
   const originData = { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { name: 'Western District Elderly Community Centre' }, geometry: { type: 'Point', coordinates: [ORIGIN.longitude, ORIGIN.latitude] } }] };
   map.getSource('access-routes')?.setData(routeData); map.getSource('access-places')?.setData(placeData); map.getSource('walk-buffer')?.setData(bufferData); map.getSource('reach-mask')?.setData(maskData); map.getSource('map-origin')?.setData(originData);
+  if (map.getLayer('reach-mask-fill') && map.getLayer('3d-buildings-context')) map.moveLayer('reach-mask-fill', '3d-buildings-context');
+  const boundaryText = $('reach-boundary-status');
+  if (boundaryText) boundaryText.textContent = state.isochrone
+    ? `${state.isochrone.properties.sample_count}/${state.isochrone.properties.requested_samples} safe directions · ${state.isochrone.geometry.type === 'MultiPolygon' ? state.isochrone.geometry.coordinates.length : 1} reachable sectors. Dashed ring = ${Math.round(state.distanceMetres)} m budget cap; it is not slope-screened.`
+    : 'Waiting for walking-route samples';
   renderMapLibreSvgRoutes();
 }
 function escapeHtml(value) { return String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
@@ -331,6 +377,11 @@ function radialDestination(origin, metres, bearing) {
   const angle = bearing * Math.PI / 180, north = metres * Math.cos(angle), east = metres * Math.sin(angle);
   return [origin.longitude + east / (111320 * Math.cos(origin.latitude * Math.PI / 180)), origin.latitude + north / 111320];
 }
+function budgetCircleGeometry(origin = ORIGIN, radius = state.distanceMetres) {
+  const ring = Array.from({ length: 48 }, (_, i) => radialDestination(origin, radius, i * 360 / 48));
+  ring.push(ring[0]);
+  return { type: 'Polygon', coordinates: [ring] };
+}
 function accessiblePrefixEndpoint(path, radius, maxSlope, routeDurationSeconds, timeBudgetSeconds) {
   if (!path || path.length < 2) return null;
   const routeLength = path.slice(1).reduce((sum, point, i) => sum + Math.max(.5, haversineMetres(path[i], point)), 0);
@@ -364,8 +415,14 @@ function sampledReachGeometry(boundary, sampleCount, origin) {
   for (const start of starts) {
     const run = [start];
     while (valid.has((run.at(-1) + 1) % sampleCount) && (run.at(-1) + 1) % sampleCount !== start) run.push((run.at(-1) + 1) % sampleCount);
-    if (run.length < 2) continue;
-    const ring = [[origin.longitude, origin.latitude, originHeight], ...run.map(i => pointsBySpoke.get(i).slice()), [origin.longitude, origin.latitude, originHeight]];
+    const center = [origin.longitude, origin.latitude, originHeight];
+    let ring;
+    if (run.length === 1) {
+      // Preserve an isolated safe bearing as its 15-degree sample cell.
+      const index = run[0], point = pointsBySpoke.get(index), radius = haversineMetres([origin.longitude, origin.latitude], point);
+      const left = radialDestination(origin, radius, (index - .5) * step), right = radialDestination(origin, radius, (index + .5) * step);
+      ring = [center, [left[0], left[1], point[2] ?? originHeight], point.slice(), [right[0], right[1], point[2] ?? originHeight], center];
+    } else ring = [center, ...run.map(i => pointsBySpoke.get(i).slice()), center];
     sectors.push([ring]);
   }
   return sectors.length ? { type: 'MultiPolygon', coordinates: sectors } : null;
@@ -413,7 +470,7 @@ async function buildLandsDContour(origin, originVersion) {
   if (state.google || originVersion !== state.originVersion || distanceMetres !== state.distanceMetres || maxSlope !== state.slope) return;
   state.boundarySamples = boundary.length;
   const geometry = boundary.length >= 2 ? sampledReachGeometry(boundary, sampleCount, origin) : null;
-  if (geometry) state.isochrone = { type: 'Feature', properties: { method: '24 sampled Lands Department 3D routes; each adjacent successful pair forms a displayed sector so unsampled or slope-blocked directions remain visibly open. Travel time is apportioned along each route by length.', sample_count: boundary.length, requested_samples: sampleCount, walk_time_seconds: walkTimeSeconds, equivalent_distance_m: distanceMetres, max_slope_deg: maxSlope }, geometry };
+  if (geometry) state.isochrone = { type: 'Feature', properties: { method: '24 sampled Lands Department 3D routes at 15-degree bearings; connected safe samples form reach sectors and isolated samples show their one-bearing cell. Unsampled or slope-blocked directions remain open. Travel time is apportioned along each route by length.', sample_count: boundary.length, requested_samples: sampleCount, walk_time_seconds: walkTimeSeconds, equivalent_distance_m: distanceMetres, max_slope_deg: maxSlope }, geometry };
   else state.isochrone = null;
   state.boundaryCache.set(cacheKey, state.isochrone);
   $('data-status').textContent = state.isochrone
@@ -458,6 +515,18 @@ function renderMapLibreSvgRoutes() {
   const map = state.maplibre, svg = $('map-route-overlay'); if (!map || !svg) return;
   const { width, height } = map.getContainer().getBoundingClientRect();
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`); svg.setAttribute('preserveAspectRatio', 'none');
+  const geometry = (state.view === 'reach' || state.view === 'map') ? state.isochrone?.geometry : null;
+  const rings = geometry?.type === 'Polygon' ? [geometry.coordinates[0]] : geometry?.type === 'MultiPolygon' ? geometry.coordinates.map(polygon => polygon[0]) : [];
+  const bufferMarkup = rings.map(ring => {
+    const screen = ring.map(point => map.project(point.slice(0, 2)));
+    if (screen.some(point => !Number.isFinite(point.x) || !Number.isFinite(point.y))) return '';
+    const d = screen.map((point, i) => `${i ? 'L' : 'M'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ') + ' Z';
+    return `<path class="map-reach-buffer" d="${d}"/>`;
+  }).join('');
+  const budgetRing = budgetCircleGeometry();
+  const budgetScreen = budgetRing.coordinates[0].map(point => map.project(point.slice(0, 2)));
+  const budgetPath = budgetScreen.every(point => Number.isFinite(point.x) && Number.isFinite(point.y))
+    ? `<path class="map-budget-ring" d="${budgetScreen.map((point, i) => `${i ? 'L' : 'M'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ')} Z"/>` : '';
   const markup = state.places.filter(p => accessible(p) && (state.filter === 'all' || p.kind === state.filter)).map(p => {
     if (!p.path?.length) return '';
     const path = p.path.map(c => c.slice(0, 2));
@@ -472,9 +541,10 @@ function renderMapLibreSvgRoutes() {
   const originMarkup = Number.isFinite(origin.x) && Number.isFinite(origin.y)
     ? `<circle class="map-route-origin-halo" cx="${origin.x.toFixed(1)}" cy="${origin.y.toFixed(1)}" r="12"/><circle class="map-route-origin-dot" cx="${origin.x.toFixed(1)}" cy="${origin.y.toFixed(1)}" r="7"/><text class="map-route-label map-origin-label" x="${(origin.x + 14).toFixed(1)}" y="${(origin.y - 11).toFixed(1)}">COMMUNITY CENTRE</text>`
     : '';
-  svg.innerHTML = `${markup}${originMarkup}`;
+  svg.innerHTML = `${(state.view === 'reach' || state.view === 'map') ? budgetPath : ''}${bufferMarkup}${markup}${originMarkup}`;
 }
 function addMapLibreLayers(map) {
+  for (const layer of map.getStyle().layers) state.mapBasePaint.set(layer.id, { fillColor: layer.paint?.['fill-color'], lineColor: layer.paint?.['line-color'], visibility: layer.layout?.visibility || 'visible' });
   map.addSource('openfreemap', { type: 'vector', url: 'https://tiles.openfreemap.org/planet' });
   map.addLayer({ id: '3d-buildings-context', source: 'openfreemap', 'source-layer': 'building', type: 'fill-extrusion', minzoom: 14, filter: ['!=', ['get', 'hide_3d'], true], paint: { 'fill-extrusion-color': '#9fa99f', 'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 14, 0, 15, ['coalesce', ['get', 'render_height'], 15]], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0], 'fill-extrusion-opacity': .42 } });
   map.addLayer({ id: '3d-buildings', source: 'openfreemap', 'source-layer': 'building', type: 'fill-extrusion', minzoom: 14, filter: ['!=', ['get', 'hide_3d'], true], paint: { 'fill-extrusion-color': '#c5c8ba', 'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 14, 0, 15, ['coalesce', ['get', 'render_height'], 15]], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0], 'fill-extrusion-opacity': .58 } });

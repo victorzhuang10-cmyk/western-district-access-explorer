@@ -50,6 +50,29 @@
 @media(max-width:760px){.map-live{font-size:8px}.map-context small{font-size:9px}.map-attribution{display:block;max-width:calc(100% - 30px);font-size:9px}.map-zoom-hint{font-size:9px}}
 .sidebar{overflow-x:hidden}.time-chip{width:max-content;max-width:100%;white-space:normal;line-height:1.35}.time-chip span:last-child{min-width:0}
 
+/* Explicit walking buffer and the three requested map modes. */
+.map-shell{--reach-fill:#b9ddc8;--reach-edge:#276d5d}
+.map-caption{min-width:270px}
+.caption-radius{min-width:86px;line-height:1.2}
+.caption-radius small{display:block;margin-top:4px;color:#777d73;font:8px var(--mono);white-space:nowrap}
+.reach-legend{position:absolute;z-index:4;right:22px;top:78px;width:245px;padding:11px 13px;background:#fbfaf4ed;border:1px solid #fff;box-shadow:0 3px 12px #25372c20;backdrop-filter:blur(6px);color:#364138}
+.reach-legend[hidden]{display:none}
+.reach-legend-title{display:flex;align-items:center;gap:8px;font:600 9px var(--mono);letter-spacing:.08em}
+.reach-legend-title>i{width:11px;height:11px;background:var(--reach-fill);border:1px solid var(--reach-edge);display:block}
+.reach-legend p{margin:7px 0 9px;color:#757d72;font:9px/1.45 var(--mono)}
+.reach-legend-items{display:flex;flex-wrap:wrap;gap:11px;color:#626a60;font:9px var(--ui)}
+.reach-legend-items span{display:flex;align-items:center;gap:5px}
+.legend-area{width:10px;height:8px;background:var(--reach-fill);border:1px solid var(--reach-edge)}
+.legend-budget{width:13px;height:8px;border-top:2px dashed #a9692e}
+.legend-route{width:12px;border-top:3px solid #276d5d}
+.legend-origin{width:8px;height:8px;border-radius:50%;background:#c94f37;box-shadow:0 0 0 2px #fff}
+.detail-fallback{padding:7px 2px 1px;color:#797e74;font:9px/1.4 var(--mono)}
+.detail-fallback[hidden]{display:none}
+.presentation-tabs .view-option{min-height:34px}
+.style-option{font-size:10px}
+.reach-mode .reach-legend{border-left:3px solid var(--reach-edge)}
+@media(max-width:760px){.reach-legend{top:61px;right:10px;width:min(220px,calc(100% - 100px));padding:8px}.reach-legend-items{gap:7px;font-size:8px}.reach-legend p{font-size:8px}.map-caption{min-width:0;max-width:calc(100% - 24px)}.caption-radius small{white-space:normal}}
+
 /* The six clear presentation states: 2D street map, 3D massing, 3D reach. */
 .view-switcher{width:310px;padding:13px 14px;background:#fbfaf5f2}
 .presentation-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
@@ -94,3 +117,7 @@
 .map-route-origin-halo { fill: #fffdf6; stroke: #c94f37; stroke-width: 3; }
 .map-route-origin-dot { fill: #c94f37; stroke: #fffdf6; stroke-width: 2; }
 .map-origin-label { fill: #934633; }
+.map-reach-buffer{fill:#68a88680;stroke:#174f3c;stroke-width:4;stroke-linejoin:round;vector-effect:non-scaling-stroke;fill-rule:evenodd}
+.diagram-mode .map-reach-buffer{fill:#73b58fbb;stroke:#174f3c;stroke-width:6}
+.map-budget-ring{fill:#d9aa4a12;stroke:#a9692e;stroke-width:2;stroke-dasharray:7 5;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.map-shell:not(.reach-mode) .map-reach-buffer{fill:#d1795a32;stroke:#c85d45;stroke-width:2.5;stroke-dasharray:6 4}
