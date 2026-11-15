@@ -179,18 +179,21 @@ async def analyze(request: AnalyzeRequest):
     if not API_KEY:
         raise HTTPException(503, "Google Maps Platform key is not configured")
     origin = request.origin or ORIGIN
-    results = []
+    semaphore = asyncio.Semaphore(6)
     async with httpx.AsyncClient(timeout=30) as client:
-        for dest in request.destinations:
-            try:
-                result = await google_route(client, origin, dest)
-                if result.get("duration_s", 0) > request.walk_time_seconds:
-                    result.update(accessible=False, reason="Beyond selected walking-time threshold")
-                elif result.get("max_slope_deg", 0) > request.max_slope_deg:
-                    result.update(accessible=False, reason="Route exceeds slope limit")
-                results.append(result)
-            except (httpx.HTTPError, KeyError, ValueError) as exc:
-                results.append({"id": dest.id, "name": dest.name, "kind": dest.kind, "accessible": False, "reason": f"Route analysis unavailable: {exc}"})
+        async def analyze_destination(dest: Destination) -> dict:
+            async with semaphore:
+                try:
+                    result = await google_route(client, origin, dest)
+                    if result.get("duration_s", 0) > request.walk_time_seconds:
+                        result.update(accessible=False, reason="Beyond selected walking-time threshold")
+                    elif result.get("max_slope_deg", 0) > request.max_slope_deg:
+                        result.update(accessible=False, reason="Route exceeds slope limit")
+                    return result
+                except (httpx.HTTPError, KeyError, ValueError) as exc:
+                    return {"id": dest.id, "name": dest.name, "kind": dest.kind, "accessible": False, "reason": f"Route analysis unavailable: {exc}"}
+
+        results = await asyncio.gather(*(analyze_destination(dest) for dest in request.destinations))
     return {"results": results, "origin": origin, "walk_time_seconds": request.walk_time_seconds, "max_slope_deg": request.max_slope_deg}
 
 
