@@ -35,6 +35,7 @@ function setRange(analyze = true) {
     $('data-status').textContent = 'LIMIT CHANGED · RELEASE TO UPDATE WALK REACH';
     return;
   }
+  fitReachView();
   if (state.google) scheduleGoogleAnalysis();
   else { renderMapLibreOverlays(); scheduleLandsDAnalysis(); }
 }
@@ -587,7 +588,7 @@ function initMapLibre() {
     catch (error) { console.error('Could not add 3D building layer', error); showToast('Map loaded, but building extrusions are unavailable.'); }
     $('data-status').textContent = 'OPENSTREETMAP 3D BUILDINGS · CSDI DESTINATIONS';
     $('map-data-label').textContent = '3D BUILDINGS · OSM STREET MAP'; $('map-attribution').textContent = '© OpenStreetMap contributors · OpenFreeMap · routes/data © Lands Department';
-    map.once('idle', () => { clearTimeout(mapLoadTimer); $('map-loading').hidden = true; applyPresentation(); renderMapLibreOverlays(); });
+    map.once('idle', () => { clearTimeout(mapLoadTimer); $('map-loading').hidden = true; applyPresentation(); renderMapLibreOverlays(); fitReachView(); });
   });
   map.on('error', e => { if (e.error) console.warn('MapLibre tile/style issue:', e.error.message); if (!map.isStyleLoaded()) { $('map-loading').textContent = 'Connecting to Hong Kong street and 3D building data…'; $('map-loading').classList.remove('map-loading-error'); } });
 }
